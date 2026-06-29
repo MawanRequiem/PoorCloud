@@ -25,3 +25,4 @@ localcloud/vendor/
 *.njsproj
 *.sln
 *.sw?
+*.md5
