@@ -1,0 +1,11 @@
+# Cursor and AI IDE Coding Rules
+
+Please refer to the primary rule definition file:
+[AGENTS.md](file:///.agents/AGENTS.md)
+
+## Core Guidelines for IDE AI Assistants:
+1. **SCAD Alignment**: Always check the architecture defined in `.agents/AGENTS.md`.
+2. **Go Backend**: Use standard libraries as much as possible. Do not introduce arbitrary routers or dependencies. Use raw argument arrays for `exec.Command` (no shell interpreters) to prevent command injection.
+3. **Frontend Stack**: React 19 + TypeScript. For styles, we use TailwindCSS v4 with a CSS-first configuration (`@import "tailwindcss";` in `src/index.css`), without any `tailwind.config.js`.
+4. **Git Commits**: Do NOT add any AI attribution / `Co-authored-by` headers to Git commits.
+5. **No Placeholders**: Never write comments like `// TODO: implement later`. Provide working implementations, stubs with functional fallbacks, or type-safe defaults.

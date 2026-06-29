@@ -1,0 +1,10 @@
+# Claude Code & CLI Assistant Instructions
+
+When working in this workspace, you must adhere to the design and technical rules defined in:
+- [.agents/AGENTS.md](file:///.agents/AGENTS.md)
+
+Key constraints:
+- Single-binary Wails (Go 1.22+ & React 19 + TypeScript + TailwindCSS v4).
+- Go backend: strictly stdlib except gopsutil/wails. Safe command arguments, anti-zombie process group management, DPAPI/Secret Service keyring APIs.
+- React frontend: virtualized lists for logs, ring-buffer capped state (1000 items), Framer Motion and Recharts.
+- Git: Do NOT include `Co-authored-by` headers in Git commits.
