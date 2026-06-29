@@ -1,0 +1,27 @@
+# Compiled binaries
+localcloud/build/bin/
+localcloud/localcloud.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Node / Frontend
+localcloud/frontend/node_modules/
+localcloud/frontend/dist/
+localcloud/frontend/.env*.local
+
+# Go / Dependency directories
+/vendor/
+localcloud/vendor/
+
+# OS/Editor specific
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
