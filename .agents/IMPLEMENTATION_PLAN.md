@@ -1,7 +1,8 @@
-# LocalCloud Grand Implementation Plan
+# LocalCloud Grand Implementation Plan v2
 
 > **ponytail: full** — Every task below passes the YAGNI ladder before it earns a line of code.
 > YAGNI → stdlib → native platform → one line → minimum that works.
+> But every feature from the SCAD IS needed. ponytail governs HOW, not WHETHER.
 
 **All AI coding assistants** (Antigravity, Claude Code, Cursor, Kimchi, OpenCode) MUST read this plan before implementing any feature. Cross-reference with [AGENTS.md](file:///.agents/AGENTS.md) for architecture rules.
 
@@ -24,277 +25,1136 @@
 
 ---
 
-## Phase 1: Core Engine — Make Stubs Real
+## Complete Feature Checklist (from SCAD)
 
-> Priority: Without real engine logic, the app is a shell. Ship this first.
+Every feature below MUST be implemented. Nothing is optional.
 
-### 1.1 Real Project Scanner
+| # | Feature | SCAD Section | Status |
+|---|---|---|---|
+| F1 | Project Scanner & Environment Sniffer | §3.1 | Stub exists |
+| F2 | Runtime Detection (Node/Bun) | §3.1 | Stub exists |
+| F3 | Bun Portable Auto-Download | §3.1 | Not started |
+| F4 | Windows Job Objects Resource Limiter | §3.2 | Stub only |
+| F5 | Linux cgroups v2 (systemd-run) Limiter | §3.2 | Stub only |
+| F6 | Linux cgroups v1 Fallback | §3.2 | Not started |
+| F7 | Linux Non-Systemd (taskset/prlimit) Fallback | §3.2 | Stub only |
+| F8 | OOM Detection & UI Alert | §3.2 | Not started |
+| F9 | Ephemeral Cloudflare Tunnel (Free Domain) | §3.3 | Stub only |
+| F10 | Permanent Cloudflare Tunnel (Custom DNS CNAME) | §3.3 | Not started |
+| F11 | Cloudflare API v4 Authentication | §3.3 | Not started |
+| F12 | Tunnel Auto-Reconnect (5 attempts) | §3.3 | Not started |
+| F13 | Tunnel Connection Drop Detection | §3.3 | Not started |
+| F14 | Vercel Env Variable Sync (PATCH) | §3.4 | Stub only |
+| F15 | Vercel Redeployment Trigger (POST) | §3.4 | Stub only |
+| F16 | Log Throttling & Backpressure (100ms batch) | §3.5 | Not started |
+| F17 | Log Ring Buffer (1000 lines in React) | §3.5 | Not started |
+| F18 | Virtualized Log List (react-window) | §3.5 | Not started |
+| F19 | Resource Usage Charts (Recharts) | §3.5 | Not started |
+| F20 | OS Keyring Secure Storage (DPAPI/D-Bus) | §4 | Not started |
+| F21 | Command Injection Guard | §4 | Partially done |
+| F22 | Anti-Zombie Process Guard (Linux PGID + Windows Job) | §4 | Not started |
+| F23 | Go-Routine Lifecycle Guard (context.WithCancel) | §4 | Partially done |
+| F24 | IPC Channel Hardening (WebView isolation) | §4 | Not started |
+| F25 | Drop-Zone Screen (drag-and-drop + file picker) | §UX | Not started |
+| F26 | Drop-Zone Shake Animation on Error | §UX | Not started |
+| F27 | Control Panel Screen (sliders, selectors) | §UX | Not started |
+| F28 | GO LIVE Button with Progress Transition | §UX | Not started |
+| F29 | Live Dashboard Screen (URL card + copy) | §UX | Not started |
+| F30 | Dev Server Process Runner (npm/bun) | — | Not started |
+| F31 | System Info (RAM/CPU detection for sliders) | — | Not started |
+| F32 | Project Config Persistence (last project, settings) | — | Not started |
+| F33 | cloudflared Binary Detection & Location | — | Not started |
+
+---
+
+## Phase 1: Core Engine — Project Scanner & Process Runner
+
+### 1.1 Project Scanner & Environment Sniffer [F1, F2]
 
 **File:** `localcloud/engine/scanner.go` [NEW]
 
-Move scan logic out of `app.go` into engine. The scanner must:
-- Accept a folder path, read `package.json` via `os.ReadFile` + `encoding/json`
-- Extract `name`, `scripts`, `dependencies` (detect framework: next, vite, remix, etc.)
-- Auto-detect the best dev script and default port by inspecting script values
-- Sniff runtimes: `exec.Command("node", "-v")`, `exec.Command("bun", "-v")`
-- Return a typed `ScanResult` struct (not `map[string]interface{}`)
+**Struct:**
+```go
+type ScanResult struct {
+    Name          string            `json:"name"`
+    Version       string            `json:"version"`
+    Scripts       map[string]string `json:"scripts"`
+    Dependencies  map[string]string `json:"dependencies"`
+    DevCommand    string            `json:"devCommand"`    // auto-detected best dev script key
+    DefaultPort   int               `json:"defaultPort"`   // parsed from script or 3000
+    Framework     string            `json:"framework"`     // "next", "vite", "remix", "cra", "unknown"
+    HasNode       bool              `json:"hasNode"`
+    NodeVersion   string            `json:"nodeVersion"`   // e.g. "v22.15.0"
+    HasBun        bool              `json:"hasBun"`
+    BunVersion    string            `json:"bunVersion"`
+    ProjectPath   string            `json:"projectPath"`
+}
+```
 
-**ponytail: one function, one struct, zero external deps.**
+**Function:** `ScanProject(folderPath string) (*ScanResult, error)`
 
-### 1.2 Real OS Resource Limiter — Windows
+**Implementation details:**
+- Read `package.json` via `os.ReadFile` + `encoding/json.Unmarshal` into a raw struct
+- Parse `name`, `version`, `scripts`, `dependencies`, `devDependencies`
+- **Framework detection:** Check `dependencies` keys: `"next"` → next, `"vite"` → vite, `"@remix-run/dev"` → remix, `"react-scripts"` → cra
+- **Dev command detection:** Priority order: `scripts["dev"]` → `scripts["start"]` → `scripts["serve"]`. Store the key name.
+- **Port detection:** Regex-scan the selected script value for `--port (\d+)` or `-p (\d+)`. Default to 3000 if not found. For Next.js, default 3000. For Vite, default 5173.
+- **Runtime sniffing:**
+  - `exec.Command("node", "-v")` — capture `CombinedOutput()`, parse version string
+  - `exec.Command("bun", "-v")` — capture `CombinedOutput()`, parse version string
+  - **Security:** Do NOT run these through shell interpreters. Raw argument array only.
+  - **Timeout:** Use `exec.CommandContext` with 3-second timeout to prevent hanging if the binary exists but is stuck
 
-**File:** `localcloud/engine/os_limiter_windows.go` [NEW, build-tagged]
+**ponytail: one function, one struct, zero external deps. All stdlib.**
 
-- Use `golang.org/x/sys/windows` (stdlib-adjacent, maintained by Go team) to call `CreateJobObjectW`, `AssignProcessToJobObject`, `SetInformationJobObject`
-- Set `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` for memory limit
-- Set `JOBOBJECT_CPU_RATE_CONTROL_INFORMATION` for CPU cap
-- Single function: `applyWindowsLimits(pid int, memMB int64, cpuPercent int) error`
+### 1.2 Bun Portable Auto-Download [F3]
 
-### 1.3 Real OS Resource Limiter — Linux
+**File:** `localcloud/engine/bundler.go` [NEW]
 
-**File:** `localcloud/engine/os_limiter_linux.go` [NEW, build-tagged]
+**Function:** `DownloadBunPortable(ctx context.Context, destDir string, onProgress func(percent int)) error`
 
-Three-tier fallback detection (run once at startup, cache result):
-1. Check `systemctl --user --version` → cgroups v2 path via `systemd-run --user --scope`
-2. Check `/sys/fs/cgroup/memory/user.slice` exists → cgroups v1 path
-3. Fallback → `taskset -c` + `prlimit --pid --as`
+**Implementation details:**
+- Download URL: `https://github.com/oven-sh/bun/releases/latest/download/bun-{platform}-{arch}.zip`
+  - Windows: `bun-windows-x64.zip`
+  - Linux: `bun-linux-x64.zip`
+- Use `net/http.Get` with context for cancellation
+- Stream body into a temp file using `io.Copy` with a `countingWriter` that calls `onProgress`
+- Extract zip using `archive/zip` stdlib
+- Place binary into `{appDataDir}/runtimes/bun/` (use Wails `Environment()` or `os.UserConfigDir()`)
+- Mark executable on Linux: `os.Chmod(bunPath, 0755)`
+- Return the full path to the bun binary
+- **Security:** Validate downloaded file size is reasonable (< 100MB). Verify zip contains exactly one executable.
+- **Cache:** If `{appDataDir}/runtimes/bun/bun` already exists and is valid, skip download.
 
-Single function: `applyLinuxLimits(pid int, memMB int64, cpuCores float64) error`
+**ponytail: stdlib net/http + archive/zip. Zero external deps.**
 
-**ponytail: Keep `os_limiter.go` as the dispatcher. Platform files only contain platform code.**
-
-### 1.4 Real Cloudflare Tunnel
-
-**File:** `localcloud/engine/tunnel.go` [MODIFY]
-
-Replace mock simulation with:
-- Locate `cloudflared` binary: check PATH, then check bundled location
-- `exec.CommandContext(ctx, "cloudflared", "tunnel", "--url", fmt.Sprintf("http://localhost:%d", port))`
-- Set `SysProcAttr.Setpgid = true` on Linux for anti-zombie
-- Pipe `cmd.StderrPipe()` (cloudflared writes URL to stderr) through `bufio.NewScanner`
-- Parse URL with `regexp.MustCompile("https://[a-zA-Z0-9-]+\\.trycloudflare\\.com")`
-- On scanner EOF or error → set status RECONNECTING, retry up to 5×
-- On context cancel → `syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)` on Linux
-
-### 1.5 Real Vercel Sync
-
-**File:** `localcloud/engine/vercel.go` [MODIFY]
-
-Remove `_ = req` stubs, actually execute:
-- `resp, err := client.Do(req)` + check `resp.StatusCode`
-- Return typed errors: `ErrVercelAuth`, `ErrVercelRateLimit`, `ErrVercelDeploy`
-- **ponytail: no retry logic yet — YAGNI until users report flaky deploys.**
-
-### 1.6 Process Runner (Dev Server Launcher)
+### 1.3 Dev Server Process Runner [F30]
 
 **File:** `localcloud/engine/runner.go` [NEW]
 
-This is the missing piece — the thing that actually runs `bun run dev` or `npm run dev`:
-- Accept: project path, script name, runtime ("node"/"bun"), resource limits
-- Create the subprocess with `exec.CommandContext`
-- On Windows: assign to Job Object before starting
-- On Linux: wrap with `systemd-run` or apply `prlimit`/`taskset` after start
-- Pipe stdout/stderr into a Go channel for log streaming
-- Detect OOM exit codes (137 on Linux, specific Job Object signals on Windows)
-- Emit structured events: `process-log`, `process-exit`, `process-oom`
+This is the **central nervous system** — it launches the user's dev server and manages its lifecycle.
 
-**ponytail: This is the central nervous system. One file, one `RunDevServer` function.**
+**Struct:**
+```go
+type RunConfig struct {
+    ProjectPath string
+    Runtime     string  // "node", "bun", or absolute path to portable bun
+    ScriptName  string  // e.g. "dev"
+    Port        int
+    MemoryMB    int64
+    CPUCores    float64
+}
+
+type RunningProcess struct {
+    Cmd       *exec.Cmd
+    PID       int
+    PGID      int // Linux only, for anti-zombie
+    LogChan   chan string
+    Cancel    context.CancelFunc
+    StartedAt time.Time
+}
+```
+
+**Function:** `RunDevServer(ctx context.Context, cfg RunConfig, onEvent func(event string, data interface{})) (*RunningProcess, error)`
+
+**Implementation details:**
+1. **Validate inputs:**
+   - `ValidatePort(cfg.Port)` → error if ≤ 1024 or > 65535
+   - Check `cfg.ProjectPath` exists via `os.Stat`
+   - Check `cfg.Runtime` binary exists via `exec.LookPath`
+2. **Build command:**
+   - `exec.CommandContext(ctx, cfg.Runtime, "run", cfg.ScriptName)`
+   - Set `cmd.Dir = cfg.ProjectPath`
+   - Set environment: `cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", cfg.Port))`
+   - **Security:** NEVER use `sh -c` or `cmd.exe /c`. Raw argument array only.
+3. **Platform-specific process attributes:**
+   - **Linux:** `cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}` — creates a new process group for anti-zombie cleanup
+   - **Windows:** Job Object assignment happens AFTER `cmd.Start()` via `os_limiter_windows.go`
+4. **Pipe stdout + stderr:**
+   - `cmd.StdoutPipe()` and `cmd.StderrPipe()` → merge into a single `io.MultiReader`
+   - Goroutine reads via `bufio.NewScanner(merged)` and pushes each line into `logChan`
+   - **Backpressure:** If channel is full (buffered 512 lines), drop oldest line. Never block the subprocess.
+5. **Start process:** `cmd.Start()`
+6. **Apply resource limits AFTER start:**
+   - Call `LimitResources(cmd.Process.Pid, cfg.MemoryMB, cfg.CPUCores)`
+   - This avoids needing to wrap the command on Linux (applies limits to running PID)
+7. **Monitor exit in goroutine:**
+   - `cmd.Wait()` — check exit code
+   - Exit code 137 on Linux → OOM killed → emit `process-oom` event
+   - Exit code 0 → clean exit → emit `process-exit` event
+   - Other codes → emit `process-exit` with error details
+8. **Emit events via `onEvent` callback:**
+   - `"process-started"` → `{pid, port}`
+   - `"process-log"` → `{line, timestamp}`
+   - `"process-exit"` → `{code, reason}`
+   - `"process-oom"` → `{memoryLimit, message: "Server Lokal Terhenti: Penggunaan memori melewati batas..."}`
+
+**ponytail: one file, one function, one struct. The Runner is the glue between scanner, limiter, and tunnel.**
 
 ---
 
-## Phase 2: Secure Storage
+## Phase 2: OS Resource Limiters — Make Kernel Calls Real
 
-> Tokens must never touch disk as plaintext. No config files with secrets.
+### 2.1 Resource Limiter Dispatcher [F4, F5, F6, F7]
 
-### 2.1 OS Keyring Abstraction
+**File:** `localcloud/engine/os_limiter.go` [MODIFY]
+
+Keep as the dispatcher. Add Linux fallback tier detection with cached result:
+
+```go
+var linuxLimiterType string // "cgroupsv2", "cgroupsv1", "posix"
+var linuxLimiterOnce sync.Once
+
+func detectLinuxLimiter() string {
+    // 1. Check systemd + cgroups v2
+    // 2. Check cgroups v1 path exists
+    // 3. Fallback to posix (taskset + prlimit)
+}
+```
+
+### 2.2 Windows Job Objects [F4]
+
+**File:** `localcloud/engine/os_limiter_windows.go` [NEW, `//go:build windows`]
+
+**Function:** `applyWindowsLimits(pid int, memMB int64, cpuPercent int) error`
+
+**Implementation details:**
+- Import `golang.org/x/sys/windows` (stdlib-adjacent, maintained by Go team)
+- Call `windows.CreateJobObject(nil, nil)` to create an anonymous Job Object
+- Open the target process: `windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(pid))`
+- Assign process: `windows.AssignProcessToJobObject(job, processHandle)`
+- **Memory limit:** Set `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`:
+  - `info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY`
+  - `info.ProcessMemoryLimit = uintptr(memMB * 1024 * 1024)`
+  - Call `windows.SetInformationJobObject(job, JobObjectExtendedLimitInformation, ...)`
+- **CPU limit:** Set `JOBOBJECT_CPU_RATE_CONTROL_INFORMATION`:
+  - `info.ControlFlags = JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP`
+  - `info.CpuRate = uint32(cpuPercent * 100)` (in hundredths of a percent)
+  - Call `windows.SetInformationJobObject(job, JobObjectCpuRateControlInformation, ...)`
+- **Auto-cleanup:** Store Job Object handle. When parent process (Wails) exits, Windows automatically terminates all processes in the Job Object.
+- Store the job handle in a package-level map: `var activeJobs sync.Map // pid → windows.Handle`
+
+**Security:** All syscall operations wrapped in error checks. No silent failures.
+
+### 2.3 Linux cgroups v2 via systemd-run [F5]
+
+**File:** `localcloud/engine/os_limiter_linux.go` [NEW, `//go:build linux`]
+
+**Function:** `applyLinuxLimits(pid int, memMB int64, cpuCores float64) error`
+
+**Implementation — Tier 1 (cgroups v2, Modern Systemd):**
+```go
+// Check: exec.Command("systemctl", "--user", "--version").Run() == nil
+// Apply: exec.Command("systemd-run", "--user", "--scope",
+//   "-p", fmt.Sprintf("MemoryMax=%dM", memMB),
+//   "-p", fmt.Sprintf("CPUQuota=%d%%", int(cpuCores*100)),
+//   "--", "cat", fmt.Sprintf("/proc/%d/cmdline", pid),
+// ).Start()
+```
+Note: For systemd-run to work on an existing PID, we need to move the PID into a new scope. Alternative: launch the process already inside the scope.
+
+**Better approach:** Instead of applying to a running PID, the runner should launch the dev server INSIDE the systemd scope:
+```go
+// In runner.go, when linuxLimiterType == "cgroupsv2":
+cmd = exec.CommandContext(ctx,
+    "systemd-run", "--user", "--scope",
+    "-p", fmt.Sprintf("MemoryMax=%dM", memMB),
+    "-p", fmt.Sprintf("CPUQuota=%d%%", int(cpuCores*100)),
+    "--", runtime, "run", scriptName,
+)
+```
+No sudo. No root. 100% user-session cgroups v2.
+
+**Implementation — Tier 2 (cgroups v1, Old Systemd):**
+```go
+// Write memory limit to /sys/fs/cgroup/memory/user.slice/localcloud-{pid}/memory.limit_in_bytes
+// Write CPU to /sys/fs/cgroup/cpu/user.slice/localcloud-{pid}/cpu.cfs_quota_us
+// Must create the cgroup directory first
+cgroupPath := fmt.Sprintf("/sys/fs/cgroup/memory/user.slice/localcloud-%d", pid)
+os.MkdirAll(cgroupPath, 0755)
+os.WriteFile(filepath.Join(cgroupPath, "memory.limit_in_bytes"), []byte(fmt.Sprintf("%d", memMB*1024*1024)), 0644)
+os.WriteFile(filepath.Join(cgroupPath, "tasks"), []byte(fmt.Sprintf("%d", pid)), 0644)
+```
+
+**Implementation — Tier 3 (Non-Systemd: Alpine, Artix, Void):**
+```go
+// CPU affinity: taskset -c 0-{N-1} -p {pid}
+exec.Command("taskset", "-c", fmt.Sprintf("0-%d", int(cpuCores)-1), "-p", fmt.Sprintf("%d", pid)).Run()
+// Memory limit: prlimit --pid={pid} --as={bytes}
+exec.Command("prlimit", fmt.Sprintf("--pid=%d", pid), fmt.Sprintf("--as=%d", memMB*1024*1024)).Run()
+```
+
+**Security:** All `exec.Command` use raw argument arrays. No shell interpretation.
+
+### 2.4 OOM Detection & UI Alert [F8]
+
+**Handled in:** `localcloud/engine/runner.go` (exit code monitoring goroutine)
+
+**Implementation details:**
+- **Linux:** Exit code 137 = SIGKILL (typically OOM). Also check 139 = SIGSEGV.
+- **Windows:** Job Object emits `ERROR_NOT_ENOUGH_MEMORY` or the process exits with code that signals memory failure. Check with `windows.GetExitCodeProcess`.
+- On OOM detection, emit to UI via Wails event:
+  ```go
+  wailsRuntime.EventsEmit(ctx, "process-oom", map[string]interface{}{
+      "message":     "Server Lokal Terhenti: Penggunaan memori melewati batas yang Anda tentukan.",
+      "memoryLimit": cfg.MemoryMB,
+      "exitCode":    exitCode,
+  })
+  ```
+- Frontend shows a **modal dialog** with:
+  - Warning icon + amber/red gradient background
+  - Indonesian text from SCAD
+  - Suggestion: "Naikkan limit slider Anda atau periksa memory leak pada kode Anda."
+  - "Restart" button + "Change Settings" button
+
+---
+
+## Phase 3: Cloudflare Tunnel Manager — Full Implementation
+
+### 3.1 cloudflared Binary Detection [F33]
+
+**File:** `localcloud/engine/tunnel.go` [MODIFY — add detection function]
+
+**Function:** `findCloudflared() (string, error)`
+
+**Implementation details:**
+- Step 1: Check `exec.LookPath("cloudflared")` — if found in PATH, return it
+- Step 2: Check bundled location: `{appDataDir}/bin/cloudflared` (or `.exe` on Windows)
+- Step 3: If not found anywhere, return error with user-friendly message for the UI to show a download prompt
+- **Cache:** Store the result in a package-level variable after first detection
+
+### 3.2 Ephemeral Tunnel (Free Domain) [F9]
+
+**File:** `localcloud/engine/tunnel.go` [MODIFY]
+
+**Function:** `StartEphemeralTunnel(ctx context.Context, localPort int, onStatus func(status, url string, err error)) error`
+
+**Implementation details:**
+- Locate cloudflared binary via `findCloudflared()`
+- Build command: `exec.CommandContext(ctx, cloudflaredPath, "tunnel", "--url", fmt.Sprintf("http://localhost:%d", localPort))`
+- **Linux anti-zombie:** `cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}`
+- **Windows anti-zombie:** Assign to an existing Job Object if one was created by the runner
+- Pipe `cmd.StderrPipe()` — cloudflared writes URL to **stderr**, not stdout
+- Start goroutine with `bufio.NewScanner(stderrPipe)`:
+  ```go
+  urlRegex := regexp.MustCompile(`https://[a-zA-Z0-9-]+\.trycloudflare\.com`)
+  for scanner.Scan() {
+      line := scanner.Text()
+      if match := urlRegex.FindString(line); match != "" {
+          onStatus("CONNECTED", match, nil)
+      }
+      // Also forward cloudflared logs to the log pipeline
+  }
+  ```
+- On scanner end (process died): enter reconnection loop
+- Store `cmd.Process.Pid` for cleanup
+
+### 3.3 Tunnel Auto-Reconnect [F12, F13]
+
+**File:** `localcloud/engine/tunnel.go` [within StartEphemeralTunnel]
+
+**Implementation details:**
+- When the scanner goroutine detects EOF (cloudflared process died) or explicit connection error strings:
+  ```go
+  maxRetries := 5
+  for attempt := 0; attempt < maxRetries; attempt++ {
+      onStatus("RECONNECTING", "", fmt.Errorf("attempt %d/%d", attempt+1, maxRetries))
+      
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+      select {
+      case <-ctx.Done():
+          return
+      case <-time.After(time.Duration(1<<attempt) * time.Second):
+      }
+      
+      // Restart cloudflared process
+      err := startCloudflaredProcess(ctx, localPort, onStatus)
+      if err == nil {
+          return // successfully reconnected
+      }
+  }
+  onStatus("FAILED", "", fmt.Errorf("exhausted %d reconnection attempts", maxRetries))
+  ```
+- **Connection drop detection:** Scan stderr for known error strings:
+  - `"connection reset"`, `"EOF"`, `"tunnel disconnected"`, `"context canceled"`
+  - Immediately emit `"RECONNECTING"` status to UI
+
+### 3.4 Permanent Tunnel with Custom DNS [F10, F11]
+
+**File:** `localcloud/engine/tunnel_api.go` [NEW]
+
+**Function:** `StartPermanentTunnel(ctx context.Context, cfg TunnelConfig) error`
+
+**Struct:**
+```go
+type TunnelConfig struct {
+    LocalPort   int
+    Domain      string // e.g. "api.mysite.com"
+    AccountID   string // Cloudflare account ID
+    APIToken    string // from OS keyring
+    TunnelName  string // unique name for this tunnel
+}
+```
+
+**Implementation details using Cloudflare API v4:**
+1. **Create named tunnel:**
+   - `POST https://api.cloudflare.com/client/v4/accounts/{account_id}/tunnels`
+   - Body: `{"name": tunnelName, "tunnel_secret": base64EncodedSecret}`
+   - Headers: `Authorization: Bearer {apiToken}`
+2. **Create DNS CNAME record:**
+   - `POST https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records`
+   - Body: `{"type": "CNAME", "name": domain, "content": "{tunnel_id}.cfargotunnel.com", "proxied": true}`
+3. **Run tunnel with credentials:**
+   - `exec.CommandContext(ctx, cloudflaredPath, "tunnel", "run", "--credentials-file", credFile, tunnelName)`
+4. **Clean up on stop:** Delete DNS record and tunnel via API
+5. **Security:**
+   - API token retrieved from OS keyring, NEVER stored in plaintext
+   - Tunnel secret generated with `crypto/rand`
+   - Credentials file written to temp dir with `0600` permissions, deleted on process end
+
+**ponytail: All HTTP calls use stdlib `net/http`. Cloudflare API v4 is simple REST.**
+
+---
+
+## Phase 4: Vercel Synchronization — Full Implementation
+
+### 4.1 Vercel API Client [F14, F15]
+
+**File:** `localcloud/engine/vercel.go` [REWRITE]
+
+**Implementation details:**
+
+**Function 1: `SyncVercelEnv(ctx context.Context, cfg VercelConfig, tunnelURL string) error`**
+
+```go
+type VercelConfig struct {
+    Token     string // from OS keyring
+    ProjectID string
+    TeamID    string // optional
+    EnvKey    string // e.g. "NEXT_PUBLIC_API_URL"
+}
+```
+
+**Step 1: Upsert environment variable**
+- `POST https://api.vercel.com/v9/projects/{projectId}/env?upsert=true`
+- If teamId: add `&teamId={teamId}` to URL
+- Body: `{"key": envKey, "value": tunnelURL, "type": "plain", "target": ["development","preview","production"]}`
+- Headers: `Authorization: Bearer {token}`, `Content-Type: application/json`
+- **Execute:** `resp, err := client.Do(req)` — actually call the API
+- **Handle responses:**
+  - 200/201 → success
+  - 401 → return `ErrVercelAuth` — token expired or invalid
+  - 403 → return `ErrVercelForbidden` — wrong project/team permissions
+  - 429 → return `ErrVercelRateLimit` — rate limited, include Retry-After header value
+  - 5xx → return `ErrVercelServer` — Vercel is down
+
+**Step 2: Trigger redeployment**
+- First, get the latest deployment to find the git source:
+  - `GET https://api.vercel.com/v6/deployments?projectId={projectId}&limit=1`
+- Then create a redeployment from the latest:
+  - `POST https://api.vercel.com/v13/deployments`
+  - Body: `{"name": projectName, "deploymentId": latestDeploymentId}` (redeploy from latest)
+- **Handle responses** same as above
+
+**Error types:**
+```go
+var (
+    ErrVercelAuth      = errors.New("vercel: authentication failed — check your API token")
+    ErrVercelForbidden = errors.New("vercel: access denied — check project and team permissions")
+    ErrVercelRateLimit = errors.New("vercel: rate limited — try again later")
+    ErrVercelServer    = errors.New("vercel: server error — Vercel may be experiencing issues")
+    ErrVercelDeploy    = errors.New("vercel: deployment trigger failed")
+)
+```
+
+**Security:**
+- Token comes from OS keyring (Phase 5), never stored in config files
+- HTTP client timeout: 15 seconds
+- Close response bodies: `defer resp.Body.Close()`
+
+---
+
+## Phase 5: Secure Storage & Secret Management
+
+### 5.1 OS Keyring — Windows DPAPI [F20]
+
+**File:** `localcloud/engine/keyring_windows.go` [NEW, `//go:build windows`]
+
+**Implementation details:**
+- Use `golang.org/x/sys/windows` to call `CryptProtectData` / `CryptUnprotectData`
+- These are DPAPI functions — encrypt data with the current Windows user's login credentials
+- Even if the encrypted blob is stolen, it cannot be decrypted on another machine or by another user
+- **Functions:**
+  ```go
+  func storeSecretWindows(service, key, value string) error {
+      // Combine service+key as description
+      // Call CryptProtectData with the value bytes
+      // Store the encrypted blob in %APPDATA%/localcloud/secrets/{service}/{key}.enc
+      // File permissions: user-only access via Windows ACLs
+  }
+  
+  func getSecretWindows(service, key string) (string, error) {
+      // Read encrypted blob from %APPDATA%/localcloud/secrets/{service}/{key}.enc
+      // Call CryptUnprotectData to decrypt
+      // Return plaintext string
+  }
+  ```
+- **Storage location:** `os.UserConfigDir()` + `/localcloud/secrets/`
+- **File permissions:** Only current user can read (NTFS ACLs via `os.Chmod` or `windows.SetNamedSecurityInfo`)
+
+### 5.2 OS Keyring — Linux D-Bus Secret Service [F20]
+
+**File:** `localcloud/engine/keyring_linux.go` [NEW, `//go:build linux`]
+
+**Implementation details:**
+- Use `github.com/godbus/dbus/v5` (already in go.mod as indirect Wails dependency — zero new deps)
+- Connect to the Secret Service API via D-Bus session bus
+- **Store:**
+  ```go
+  func storeSecretLinux(service, key, value string) error {
+      conn, _ := dbus.SessionBus()
+      // Call org.freedesktop.secrets.Service.CreateItem
+      // Collection: "default" (user's default keyring)
+      // Label: "LocalCloud - {service}/{key}"
+      // Secret: value bytes
+      // Attributes: {"service": service, "key": key, "application": "localcloud"}
+  }
+  ```
+- **Retrieve:**
+  ```go
+  func getSecretLinux(service, key string) (string, error) {
+      conn, _ := dbus.SessionBus()
+      // Call org.freedesktop.secrets.Service.SearchItems with attributes
+      // Unlock if needed
+      // Call GetSecret on the item
+      // Return plaintext
+  }
+  ```
+- **Fallback:** If no secret service is running (minimal Linux installs), fall back to DPAPI-style file encryption using `crypto/aes` with a key derived from machine ID (`/etc/machine-id`) + user UID. Mark with `// ponytail: fallback encryption`.
+
+### 5.3 Keyring Dispatcher
 
 **File:** `localcloud/engine/keyring.go` [NEW]
 
-- **Windows:** Use `golang.org/x/sys/windows` to call `CryptProtectData` / `CryptUnprotectData` (DPAPI)
-- **Linux:** Use `github.com/godbus/dbus/v5` (already in go.mod as indirect dep of Wails) to talk to `org.freedesktop.secrets` via D-Bus Secret Service API
-- Two functions: `StoreSecret(service, key, value string) error` and `GetSecret(service, key string) (string, error)`
-- Service name: `"localcloud"`
+```go
+func StoreSecret(service, key, value string) error  // dispatches to platform
+func GetSecret(service, key string) (string, error)  // dispatches to platform
+func DeleteSecret(service, key string) error          // dispatches to platform
+```
 
-**ponytail: godbus is already in go.mod. Zero new deps.**
+**Services used:**
+- `"cloudflare"` — stores API token
+- `"vercel"` — stores API token
+- `"vercel-project"` — stores project ID + team ID (not secret, but grouped here for consistency)
 
 ---
 
-## Phase 3: Log Pipeline & Dashboard
+## Phase 6: Log Pipeline & Performance Monitoring
 
-> The SCAD demands 100ms batched log dispatch and a 1000-line ring buffer in the UI.
-
-### 3.1 Log Batcher (Go)
+### 6.1 Log Batcher (Go) [F16]
 
 **File:** `localcloud/engine/logpipe.go` [NEW]
 
-- Accept a `<-chan string` from the process runner
-- Buffer into a `[]string` slice
-- Every 100ms (via `time.NewTicker`), flush the batch to Wails via `EventsEmit(ctx, "process-log", batch)`
-- If batch is empty, skip the emit
-- Bound to `context.WithCancel` for lifecycle management
+**Function:** `StartLogPipe(ctx context.Context, logChan <-chan string, emitFn func(eventName string, data interface{}))`
 
-**ponytail: one goroutine, one ticker, one channel. No ring buffer on the Go side — UI handles that.**
-
-### 3.2 Log Terminal (React)
-
-**File:** `localcloud/frontend/src/components/LogTerminal.tsx` [NEW]
-
-- Subscribe to `process-log` events via `EventsOn`
-- Maintain state with ring buffer: `setLogs(prev => [...prev, ...newLogs].slice(-1000))`
-- Render with `react-window` `FixedSizeList` for virtualization
-- Color-code by content: green for 2xx, red for 4xx/5xx, gray for info
-- Auto-scroll to bottom unless user scrolls up
-
-### 3.3 Resource Charts (React)
-
-**File:** `localcloud/frontend/src/components/ResourceChart.tsx` [NEW]
-
-- Subscribe to `resource-usage` events (emitted by Go every 1s)
-- Use Recharts `AreaChart` with gradient fill
-- Show RAM usage line + red threshold line at the user-set limit
-- Show CPU percentage area
-- Keep last 60 data points (1 minute window)
-
-**ponytail: Recharts and react-window are already in package.json.**
-
----
-
-## Phase 4: UI Screens (The Real UX Journey)
-
-> The SCAD defines 4 screens. Build them as route-less state transitions with Framer Motion.
-
-### 4.1 App State Machine
-
-**File:** `localcloud/frontend/src/App.tsx` [REWRITE]
-
-Replace the test dashboard with a state machine:
+**Implementation details:**
+```go
+func StartLogPipe(ctx context.Context, logChan <-chan string, emitFn func(string, interface{})) {
+    ticker := time.NewTicker(100 * time.Millisecond)
+    defer ticker.Stop()
+    
+    var batch []string
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case line := <-logChan:
+            batch = append(batch, line)
+        case <-ticker.C:
+            if len(batch) == 0 {
+                continue
+            }
+            emitFn("process-log", batch)
+            batch = batch[:0] // reset slice, keep capacity
+        }
+    }
+}
 ```
-type AppScreen = "dropzone" | "control" | "launching" | "dashboard"
-```
-Use `useState<AppScreen>("dropzone")` and render the matching component. Wrap transitions in `<AnimatePresence>` from Framer Motion.
 
-### 4.2 Screen 1: Drop-Zone
+**Optimization details:**
+- `batch = batch[:0]` reuses the underlying array allocation — zero garbage collection pressure
+- Ticker at 100ms = max 10 UI updates per second — keeps React at 60fps
+- Channel read is non-blocking within the select — never blocks the subprocess
+- **Backpressure:** The runner's log channel is buffered (512 lines). If full, the runner drops old lines instead of blocking.
 
-**File:** `localcloud/frontend/src/screens/DropZone.tsx` [NEW]
+### 6.2 Resource Usage Monitor (Go) [F19]
 
-- Full-screen centered drop area with dashed border
-- Use `OnFileDrop` from Wails runtime for native drag-and-drop
-- Also show a "Browse" button using Wails `OpenDirectoryDialog`
-- On drop/select → call `ScanProject(path)`
-- If valid → transition to "control" screen with scan result
-- If invalid → shake animation + red error text (Framer Motion `animate={{ x: [0,-10,10,-10,0] }}`)
+**File:** `localcloud/engine/monitor.go` [NEW]
 
-### 4.3 Screen 2: Control Panel
+**Function:** `StartResourceMonitor(ctx context.Context, pid int, emitFn func(string, interface{}))`
 
-**File:** `localcloud/frontend/src/screens/ControlPanel.tsx` [NEW]
+**Implementation details:**
+- Run in a goroutine, poll every 1 second
+- **Linux:** Read `/proc/{pid}/statm` for memory, `/proc/{pid}/stat` for CPU time
+  ```go
+  // Memory: read /proc/{pid}/statm, field 1 = resident pages
+  // Multiply by os.Getpagesize() to get bytes
+  // CPU: read /proc/{pid}/stat, fields 14+15 = utime+stime
+  // Calculate delta between polls to get CPU percentage
+  ```
+- **Windows:** Use `windows.GetProcessMemoryInfo` for memory, `windows.GetProcessTimes` for CPU
+- **Emit:**
+  ```go
+  emitFn("resource-usage", map[string]interface{}{
+      "ramMB":      currentRAM,
+      "ramPercent": float64(currentRAM) / float64(limitMB) * 100,
+      "cpuPercent": cpuPercent,
+      "timestamp":  time.Now().UnixMilli(),
+  })
+  ```
+- **ponytail: reads /proc directly on Linux. Uses Windows API on Windows. Zero deps like gopsutil.**
 
-- Display project name, detected runtime, available scripts
-- RAM slider: min 128 MB, max = system RAM (get from Go), step 128 MB
-- CPU cores selector: 1 to N (get available cores from Go)
-- Port input: pre-filled from scan, validated 1025–65535
-- Script dropdown: populated from `package.json` scripts
-- Vercel sync toggle + token/project input (optional)
-- **"GO LIVE"** button at bottom
-
-### 4.4 Screen 3: Launching
-
-**File:** `localcloud/frontend/src/screens/Launching.tsx` [NEW]
-
-- Shows a vertical progress stepper with animated checkmarks:
-  1. "Memulai server lokal..." → fires `RunDevServer`
-  2. "Menerapkan batasan resource..." → fires `LimitResources`
-  3. "Membuka terowongan aman..." → fires `StartTunnel`
-  4. "Menyelaraskan Vercel..." → fires `SyncVercel` (if enabled)
-- Each step subscribes to events and marks complete when the backend confirms
-- On all complete → transition to "dashboard"
-
-### 4.5 Screen 4: Live Dashboard
-
-**File:** `localcloud/frontend/src/screens/Dashboard.tsx` [NEW]
-
-- Top: URL card with copy button (use `ClipboardSetText` from Wails runtime)
-- Middle: `ResourceChart` (RAM + CPU) side by side
-- Bottom: `LogTerminal` full-width
-- Floating "STOP" button (red, fixed bottom-right)
-- Status indicator dot in top-right (green = live, amber = reconnecting, gray = dead)
-
----
-
-## Phase 5: System Hardening
-
-> These are non-negotiable constraints from the SCAD. Not optional.
-
-### 5.1 Anti-Zombie Process Guard
-
-**File:** `localcloud/main.go` [MODIFY]
-
-- Add `OnShutdown` handler to Wails options
-- In `OnShutdown`: call `engine.KillAllProcesses()` which:
-  - Linux: `syscall.Kill(-pgid, syscall.SIGKILL)` for every tracked process group
-  - Windows: Job Object auto-terminates (already handled)
-- Also call `StopTunnel()` and cancel all contexts
-
-### 5.2 Port Validation
-
-**File:** `localcloud/engine/validate.go` [NEW]
-
-- `ValidatePort(port int) error` — must be > 1024 and ≤ 65535
-- Called in `app.go` before any tunnel or server start
-- **ponytail: one function, 4 lines.**
-
-### 5.3 IPC Hardening
-
-**File:** `localcloud/main.go` [MODIFY]
-
-- Set `options.App.Windows.WebviewDisableRendererCodeIntegrity` and other WebView2 security options as available in Wails v2
-- Disable external navigation in the WebView
-
----
-
-## Phase 6: System Info Bindings
-
-> The UI needs to know system RAM and CPU count for the sliders.
-
-### 6.1 System Info
+### 6.3 System Info (Go) [F31]
 
 **File:** `localcloud/engine/sysinfo.go` [NEW]
 
-- `GetSystemInfo() (totalRAM int64, cpuCount int)`
-- Use `runtime.NumCPU()` for cores (stdlib, zero deps)
-- For total RAM: read `/proc/meminfo` on Linux, `GlobalMemoryStatusEx` on Windows via `golang.org/x/sys/windows`
-- **ponytail: avoids importing gopsutil for just two numbers.**
+**Function:** `GetSystemInfo() SystemInfo`
+
+```go
+type SystemInfo struct {
+    TotalRAMMB int64 `json:"totalRamMB"`
+    CPUCores   int   `json:"cpuCores"`
+    OS         string `json:"os"`      // "windows" or "linux"
+    Arch       string `json:"arch"`    // "amd64", "arm64"
+}
+```
+
+**Implementation:**
+- CPU cores: `runtime.NumCPU()` — stdlib
+- Total RAM:
+  - **Linux:** Parse `/proc/meminfo`, regex for `MemTotal:\s+(\d+) kB`, convert to MB
+  - **Windows:** `windows.GlobalMemoryStatusEx()` → `stat.TotalPhys / 1024 / 1024`
+- OS/Arch: `runtime.GOOS`, `runtime.GOARCH`
+
+**ponytail: avoids importing gopsutil for just two numbers.**
 
 ---
 
-## File Map Summary
+## Phase 7: Frontend — Complete UX Journey
+
+### 7.1 App State Machine [F25–F29]
+
+**File:** `localcloud/frontend/src/App.tsx` [REWRITE]
+
+```tsx
+type AppScreen = "dropzone" | "control" | "launching" | "dashboard"
+
+function App() {
+  const [screen, setScreen] = useState<AppScreen>("dropzone")
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+  const [tunnelURL, setTunnelURL] = useState("")
+  const [runConfig, setRunConfig] = useState<RunConfig | null>(null)
+
+  return (
+    <AnimatePresence mode="wait">
+      {screen === "dropzone" && <DropZone onScanned={(r) => { setScanResult(r); setScreen("control") }} />}
+      {screen === "control" && <ControlPanel scan={scanResult!} onGoLive={(cfg) => { setRunConfig(cfg); setScreen("launching") }} />}
+      {screen === "launching" && <Launching config={runConfig!} onComplete={(url) => { setTunnelURL(url); setScreen("dashboard") }} />}
+      {screen === "dashboard" && <Dashboard tunnelURL={tunnelURL} onStop={() => { setScreen("dropzone") }} />}
+    </AnimatePresence>
+  )
+}
+```
+
+### 7.2 Screen 1: Drop-Zone [F25, F26]
+
+**File:** `localcloud/frontend/src/screens/DropZone.tsx` [NEW]
+
+**Implementation details:**
+- Full-screen dark background with centered dashed border drop area
+- Use Wails runtime `OnFileDrop` for native drag-and-drop support:
+  ```tsx
+  useEffect(() => {
+    OnFileDrop((x, y, paths) => {
+      if (paths.length > 0) handleFolderSelect(paths[0])
+    }, true)
+    return () => OnFileDropOff()
+  }, [])
+  ```
+- "Browse Folder" button using Wails `OpenDirectoryDialog`:
+  ```tsx
+  import { OpenDirectoryDialog } from "../wailsjs/go/main/App"
+  ```
+  (Need to add `OpenDirectoryDialog` binding in `app.go`)
+- On folder select → call `ScanProject(path)`
+- **If valid:** Transition to control screen with Framer Motion `exit={{ opacity: 0, y: -20 }}`
+- **If invalid (no package.json):**
+  - Shake animation: `animate={{ x: [0, -10, 10, -10, 10, 0] }}` with `transition={{ duration: 0.4 }}`
+  - Red border flash
+  - Error text: *"Berkas package.json tidak ditemukan. Pastikan Anda memilih root folder project JavaScript Anda."*
+- **If no runtime detected:**
+  - Amber warning banner: *"Runtime Tidak Terdeteksi. Klik di sini untuk mengunduh Bun portabel otomatis ke dalam aplikasi."*
+  - Download button calls `DownloadBunPortable` binding
+  - Show download progress bar
+
+### 7.3 Screen 2: Control Panel [F27]
+
+**File:** `localcloud/frontend/src/screens/ControlPanel.tsx` [NEW]
+
+**Implementation details:**
+- **Project info card:** Name, framework badge, runtime detected
+- **Script selector:** Dropdown populated from `scanResult.scripts`, pre-selected to `scanResult.devCommand`
+- **Port input:** Number input, pre-filled with `scanResult.defaultPort`, validated client-side (1025–65535)
+- **RAM slider:**
+  - Min: 128 MB
+  - Max: system total RAM (fetched from `GetSystemInfo()`)
+  - Step: 128 MB
+  - Visual: Tailwind slider with gradient track (green → amber → red)
+  - Label shows current value in MB
+- **CPU cores selector:**
+  - Buttons/chips for 1, 2, 3, ... N cores (N from `GetSystemInfo().cpuCores`)
+  - Selected state highlighted
+- **Vercel sync toggle:**
+  - Off by default
+  - When toggled on, expand to show:
+    - Vercel API token input (password type, stored in keyring on submit)
+    - Project ID input
+    - Team ID input (optional)
+    - Env variable key input (default: `"NEXT_PUBLIC_API_URL"`)
+- **Cloudflare mode selector:**
+  - "Free Domain (Ephemeral)" — default, no config needed
+  - "Custom Domain (Permanent)" — shows API token, account ID, domain inputs
+- **"GO LIVE" button:**
+  - Full-width green gradient button at bottom
+  - Disabled until all required fields are valid
+  - On click → transition to launching screen
+
+### 7.4 Screen 3: Launching [F28]
+
+**File:** `localcloud/frontend/src/screens/Launching.tsx` [NEW]
+
+**Implementation details:**
+- Vertical stepper with 3–4 steps, each with animated icon:
+  1. **"Memulai server lokal..."** → calls `RunDevServer` binding
+     - Listens for `process-started` event → marks complete
+  2. **"Menerapkan batasan resource..."** → already applied by runner
+     - Marks complete immediately after step 1
+  3. **"Membuka terowongan aman..."** → calls `StartTunnel` binding
+     - Listens for `tunnel-status` == `CONNECTED` → marks complete
+  4. **"Menyelaraskan Vercel..."** → calls `SyncVercel` binding (only if enabled)
+     - Awaits Promise resolution → marks complete
+- Each step: circle icon → spinner while in progress → green checkmark when done → red X on error
+- Framer Motion `layoutId` transitions for smooth step animations
+- On all complete → auto-transition to dashboard after 500ms delay
+- On error → show error message with "Retry" button for that specific step
+
+### 7.5 Screen 4: Live Dashboard [F29]
+
+**File:** `localcloud/frontend/src/screens/Dashboard.tsx` [NEW]
+
+**Implementation details:**
+- **Top bar:** Status indicator dot + "LocalCloud" text + uptime counter
+- **URL Card:**
+  - Glass-morphism card with the public URL
+  - Copy button using `ClipboardSetText(url)` from Wails runtime
+  - "Open in Browser" button using `BrowserOpenURL(url)` from Wails runtime
+  - Green glow border when connected, gray when reconnecting
+- **Resource Charts (middle):**
+  - Two side-by-side `ResourceChart` components (RAM + CPU)
+  - Recharts `AreaChart` with smooth gradient fill
+  - Red dashed threshold line at the user-set limit
+  - 60-second scrolling window (last 60 data points at 1s interval)
+- **Log Terminal (bottom):**
+  - Full-width `LogTerminal` component
+  - Takes 50% of remaining height
+  - Scrollable with virtualization
+- **Floating controls:**
+  - Red "STOP" button (fixed bottom-right, with Framer Motion scale animation)
+  - On click: calls `StopServer`, `StopTunnel`, transitions back to dropzone
+
+### 7.6 Log Terminal Component [F17, F18]
+
+**File:** `localcloud/frontend/src/components/LogTerminal.tsx` [NEW]
+
+**Implementation details:**
+```tsx
+function LogTerminal() {
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const listRef = useRef<FixedSizeList>(null)
+  const [autoScroll, setAutoScroll] = useState(true)
+
+  useEffect(() => {
+    const unsub = EventsOn("process-log", (batch: string[]) => {
+      setLogs(prev => {
+        const newLogs = [...prev, ...batch.map(line => parseLogLine(line))]
+        return newLogs.slice(-1000) // Ring buffer: max 1000 entries
+      })
+    })
+    return unsub
+  }, [])
+
+  // Auto-scroll to bottom when new logs arrive (unless user scrolled up)
+  useEffect(() => {
+    if (autoScroll && listRef.current) {
+      listRef.current.scrollToItem(logs.length - 1)
+    }
+  }, [logs, autoScroll])
+
+  return (
+    <FixedSizeList
+      ref={listRef}
+      height={400}
+      width="100%"
+      itemCount={logs.length}
+      itemSize={24}
+      onScroll={({ scrollOffset, scrollUpdateWasRequested }) => {
+        if (!scrollUpdateWasRequested) {
+          // User manually scrolled — check if at bottom
+          const isAtBottom = scrollOffset >= (logs.length * 24 - 400 - 48)
+          setAutoScroll(isAtBottom)
+        }
+      }}
+    >
+      {({ index, style }) => <LogLine style={style} entry={logs[index]} />}
+    </FixedSizeList>
+  )
+}
+```
+
+**LogLine color rules:**
+- Contains "200", "201", "304" → green text
+- Contains "404", "500", "503", "error", "Error" → red bold text
+- Contains "warn", "Warning" → amber text
+- Default → gray text
+- Timestamp prefix in dim color
+
+### 7.7 Resource Chart Component [F19]
+
+**File:** `localcloud/frontend/src/components/ResourceChart.tsx` [NEW]
+
+**Implementation details:**
+```tsx
+function ResourceChart({ type, limit }: { type: "ram" | "cpu", limit: number }) {
+  const [data, setData] = useState<DataPoint[]>([])
+
+  useEffect(() => {
+    const unsub = EventsOn("resource-usage", (usage) => {
+      setData(prev => {
+        const point = {
+          time: new Date(usage.timestamp).toLocaleTimeString(),
+          value: type === "ram" ? usage.ramMB : usage.cpuPercent,
+        }
+        return [...prev, point].slice(-60) // 60 second window
+      })
+    })
+    return unsub
+  }, [type])
+
+  return (
+    <AreaChart data={data} width={360} height={200}>
+      <defs>
+        <linearGradient id={`gradient-${type}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor={type === "ram" ? "#6366f1" : "#10b981"} stopOpacity={0.8}/>
+          <stop offset="95%" stopColor={type === "ram" ? "#6366f1" : "#10b981"} stopOpacity={0}/>
+        </linearGradient>
+      </defs>
+      <Area type="monotone" dataKey="value" stroke={type === "ram" ? "#6366f1" : "#10b981"} fill={`url(#gradient-${type})`} />
+      {/* Red threshold line */}
+      <ReferenceLine y={limit} stroke="#ef4444" strokeDasharray="5 5" label={{ value: "Limit", fill: "#ef4444" }} />
+      <XAxis dataKey="time" tick={{ fontSize: 10, fill: "#6b7280" }} />
+      <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} />
+      <Tooltip />
+    </AreaChart>
+  )
+}
+```
+
+---
+
+## Phase 8: Project Config Persistence & Caching
+
+### 8.1 App Config Storage [F32]
+
+**File:** `localcloud/engine/config.go` [NEW]
+
+**Purpose:** Remember the user's last project path, settings, and preferences between sessions.
+
+**Implementation details:**
+```go
+type AppConfig struct {
+    LastProjectPath string          `json:"lastProjectPath"`
+    LastRunConfig   *RunConfigSave  `json:"lastRunConfig,omitempty"`
+    WindowBounds    *WindowBounds   `json:"windowBounds,omitempty"`
+}
+
+type RunConfigSave struct {
+    ScriptName  string  `json:"scriptName"`
+    Port        int     `json:"port"`
+    MemoryMB    int64   `json:"memoryMB"`
+    CPUCores    float64 `json:"cpuCores"`
+    VercelSync  bool    `json:"vercelSync"`
+    VercelEnvKey string `json:"vercelEnvKey"`
+    TunnelMode  string  `json:"tunnelMode"` // "ephemeral" or "permanent"
+}
+
+type WindowBounds struct {
+    X      int `json:"x"`
+    Y      int `json:"y"`
+    Width  int `json:"width"`
+    Height int `json:"height"`
+}
+```
+
+**Storage location:** `{os.UserConfigDir()}/localcloud/config.json`
+- Windows: `%APPDATA%/localcloud/config.json`
+- Linux: `~/.config/localcloud/config.json`
+
+**Functions:**
+```go
+func LoadConfig() (*AppConfig, error)  // os.ReadFile + json.Unmarshal
+func SaveConfig(cfg *AppConfig) error  // json.MarshalIndent + os.WriteFile
+```
+
+**Security:** This file stores NO secrets. API tokens go in the OS keyring. Config only stores paths, ports, and UI preferences.
+
+**ponytail: stdlib encoding/json + os. No database, no SQLite, no external config library.**
+
+### 8.2 Scanner Result Cache
+
+**File:** `localcloud/engine/scanner.go` [add caching within existing file]
+
+**Implementation details:**
+- After scanning, cache the `ScanResult` in memory (package-level `var lastScan *ScanResult`)
+- Include `ModTime` of `package.json` in the cache
+- On re-scan of the same path, check if `package.json` was modified (via `os.Stat().ModTime()`)
+- If not modified, return cached result instantly
+- **ponytail: in-memory cache only. No file-based cache. YAGNI.**
+
+### 8.3 Runtime Detection Cache
+
+**File:** `localcloud/engine/scanner.go` [add caching within existing file]
+
+- Cache runtime detection results (`hasNode`, `hasBun`, versions) with a `sync.Once`
+- Runtimes don't change during a session — detect once, cache forever
+- User can trigger a "re-detect" from the UI which resets the cache
+
+---
+
+## Phase 9: System Hardening & Security
+
+### 9.1 Anti-Zombie Process Guard [F22]
+
+**File:** `localcloud/engine/processguard.go` [NEW]
+
+**Implementation details:**
+```go
+var (
+    trackedPIDs   sync.Map // pid → pgid (Linux) or jobHandle (Windows)
+    trackedCancel sync.Map // pid → context.CancelFunc
+)
+
+func TrackProcess(pid, pgid int, cancel context.CancelFunc)
+func UntrackProcess(pid int)
+
+func KillAllProcesses() {
+    trackedPIDs.Range(func(key, value interface{}) bool {
+        pid := key.(int)
+        // Platform-specific kill
+        killProcess(pid, value)
+        return true
+    })
+    trackedCancel.Range(func(key, value interface{}) bool {
+        cancel := value.(context.CancelFunc)
+        cancel()
+        return true
+    })
+}
+```
+
+**Wiring in `main.go`:**
+```go
+OnShutdown: func(ctx context.Context) {
+    engine.KillAllProcesses()
+    engine.StopTunnel()
+},
+```
+
+**Linux-specific:**
+```go
+// Kill entire process group, not just the PID
+syscall.Kill(-pgid, syscall.SIGKILL)
+```
+
+**Windows-specific:**
+```go
+// Close Job Object handle — Windows auto-terminates all processes in the job
+windows.CloseHandle(jobHandle)
+```
+
+### 9.2 Command Injection Prevention [F21]
+
+**Enforced across ALL files.** Not a single file — a coding rule.
+
+**Rules:**
+1. **NEVER** use `sh -c`, `bash -c`, `cmd.exe /c`, or `powershell -Command`
+2. **ALWAYS** use `exec.Command("binary", "arg1", "arg2", ...)` with separated arguments
+3. **ALWAYS** validate user-provided values before passing to exec:
+   - Ports: integer, > 1024, ≤ 65535
+   - Paths: must exist via `os.Stat`, no path traversal (`..`)
+   - Script names: must be a key in the parsed `package.json` scripts map
+   - Runtime names: must be "node", "bun", or an absolute path verified via `exec.LookPath`
+
+**File:** `localcloud/engine/validate.go` [NEW]
+
+```go
+func ValidatePort(port int) error {
+    if port <= 1024 || port > 65535 {
+        return fmt.Errorf("port must be between 1025 and 65535, got %d", port)
+    }
+    return nil
+}
+
+func ValidatePath(path string) error {
+    // Prevent path traversal
+    cleaned := filepath.Clean(path)
+    if strings.Contains(cleaned, "..") {
+        return fmt.Errorf("path traversal not allowed")
+    }
+    info, err := os.Stat(cleaned)
+    if err != nil {
+        return fmt.Errorf("path does not exist: %s", cleaned)
+    }
+    if !info.IsDir() {
+        return fmt.Errorf("path is not a directory: %s", cleaned)
+    }
+    return nil
+}
+
+func ValidateScriptName(name string, scripts map[string]string) error {
+    if _, ok := scripts[name]; !ok {
+        return fmt.Errorf("script '%s' not found in package.json", name)
+    }
+    return nil
+}
+```
+
+### 9.3 IPC Channel Hardening [F24]
+
+**File:** `localcloud/main.go` [MODIFY]
+
+**Implementation details:**
+- Disable drag-and-drop of URLs into the WebView (we handle file drops ourselves via Wails API)
+- Set Content Security Policy headers if Wails supports them
+- Configure Wails options:
+  ```go
+  Windows: &windows.Options{
+      WebviewIsStatusBarEnabled: false,
+      WebviewBrowserAcceleratorKeyIsEnabled: false,
+      // Disable external navigation
+  },
+  ```
+- Prevent navigation to external URLs from within the WebView
+- **ponytail: use what Wails v2 exposes. Don't fight the framework.**
+
+### 9.4 Go-Routine Lifecycle Guard [F23]
+
+**Enforced in ALL goroutines across ALL files.**
+
+**Rule:** Every goroutine MUST:
+1. Accept a `context.Context` parameter
+2. Have a `case <-ctx.Done(): return` in its select loop
+3. Call `defer cleanup()` for any resources it manages
+4. Be tracked in `processguard.go` if it manages an external process
+
+**No fire-and-forget goroutines allowed.**
+
+---
+
+## Phase 10: Additional App Bindings & Bridge Layer
+
+### 10.1 Updated App Struct & Bindings
+
+**File:** `localcloud/app.go` [REWRITE]
+
+All functions exposed to the frontend:
+
+```go
+// Project management
+func (a *App) ScanProject(path string) (*engine.ScanResult, error)
+func (a *App) OpenDirectoryDialog() (string, error)  // uses wailsRuntime.OpenDirectoryDialog
+
+// Dev server lifecycle
+func (a *App) StartDevServer(cfg engine.RunConfig) error
+func (a *App) StopDevServer() error
+
+// Resource management
+func (a *App) GetSystemInfo() engine.SystemInfo
+
+// Tunnel management
+func (a *App) StartEphemeralTunnel(port int) error
+func (a *App) StartPermanentTunnel(cfg engine.TunnelConfig) error
+func (a *App) StopTunnel()
+func (a *App) GetTunnelStatus() (string, string)
+
+// Vercel sync
+func (a *App) SyncVercel(envKey, tunnelURL string) error  // uses stored keyring creds
+
+// Secret management
+func (a *App) StoreCredential(service, key, value string) error
+func (a *App) HasCredential(service, key string) bool
+func (a *App) DeleteCredential(service, key string) error
+// Note: NO GetCredential exposed to frontend — secrets stay in Go
+
+// Config persistence
+func (a *App) LoadConfig() (*engine.AppConfig, error)
+func (a *App) SaveConfig(cfg engine.AppConfig) error
+
+// Bun portable
+func (a *App) DownloadBunPortable() error  // emits progress events
+```
+
+**Security note:** `GetCredential` is NOT exposed to the frontend. Secrets should only be used server-side (Go) and never sent to the WebView JavaScript context.
+
+---
+
+## Complete File Map
 
 ```
 localcloud/
-├── main.go                      [MODIFY] — add OnShutdown, IPC hardening
-├── app.go                       [MODIFY] — add new bindings, typed returns
+├── main.go                          [MODIFY] — OnShutdown, IPC hardening
+├── app.go                           [REWRITE] — all bindings listed above
 ├── engine/
-│   ├── scanner.go               [NEW]    — project scanner
-│   ├── runner.go                [NEW]    — dev server process launcher
-│   ├── os_limiter.go            [KEEP]   — dispatcher (switch runtime.GOOS)
-│   ├── os_limiter_windows.go    [NEW]    — Job Objects via x/sys/windows
-│   ├── os_limiter_linux.go      [NEW]    — cgroups / taskset / prlimit
-│   ├── tunnel.go                [MODIFY] — real cloudflared exec
-│   ├── vercel.go                [MODIFY] — real HTTP calls
-│   ├── keyring.go               [NEW]    — DPAPI + D-Bus secret storage
-│   ├── logpipe.go               [NEW]    — 100ms batched log emitter
-│   ├── sysinfo.go               [NEW]    — RAM + CPU count
-│   └── validate.go              [NEW]    — port validation
+│   ├── scanner.go                   [NEW]    — project scanner + cache
+│   ├── runner.go                    [NEW]    — dev server process launcher
+│   ├── processguard.go              [NEW]    — anti-zombie PID tracker
+│   ├── os_limiter.go                [KEEP]   — dispatcher (switch runtime.GOOS)
+│   ├── os_limiter_windows.go        [NEW]    — Job Objects via x/sys/windows
+│   ├── os_limiter_linux.go          [NEW]    — cgroups v2/v1/posix fallback
+│   ├── tunnel.go                    [REWRITE] — real cloudflared + reconnect
+│   ├── tunnel_api.go                [NEW]    — permanent tunnel + CF API v4
+│   ├── vercel.go                    [REWRITE] — real HTTP calls + error types
+│   ├── keyring.go                   [NEW]    — dispatcher
+│   ├── keyring_windows.go           [NEW]    — DPAPI
+│   ├── keyring_linux.go             [NEW]    — D-Bus Secret Service
+│   ├── logpipe.go                   [NEW]    — 100ms batched log emitter
+│   ├── monitor.go                   [NEW]    — /proc or Windows API resource monitor
+│   ├── sysinfo.go                   [NEW]    — RAM + CPU (stdlib)
+│   ├── config.go                    [NEW]    — JSON config persistence
+│   ├── bundler.go                   [NEW]    — Bun portable auto-download
+│   └── validate.go                  [NEW]    — port, path, script validation
 ├── frontend/src/
-│   ├── App.tsx                  [REWRITE] — state machine router
+│   ├── App.tsx                      [REWRITE] — state machine router
 │   ├── screens/
-│   │   ├── DropZone.tsx         [NEW]
-│   │   ├── ControlPanel.tsx     [NEW]
-│   │   ├── Launching.tsx        [NEW]
-│   │   └── Dashboard.tsx        [NEW]
+│   │   ├── DropZone.tsx             [NEW]    — drag-drop + file picker
+│   │   ├── ControlPanel.tsx         [NEW]    — sliders, selectors, config
+│   │   ├── Launching.tsx            [NEW]    — progress stepper
+│   │   └── Dashboard.tsx            [NEW]    — URL card, charts, logs
 │   ├── components/
-│   │   ├── LogTerminal.tsx      [NEW]
-│   │   └── ResourceChart.tsx    [NEW]
-│   └── index.css                [KEEP]
+│   │   ├── LogTerminal.tsx          [NEW]    — virtualized ring-buffer log
+│   │   ├── ResourceChart.tsx        [NEW]    — Recharts area chart
+│   │   ├── OOMModal.tsx             [NEW]    — OOM warning dialog
+│   │   └── StatusDot.tsx            [NEW]    — connection status indicator
+│   └── index.css                    [KEEP]
 ```
 
 ---
@@ -303,19 +1163,36 @@ localcloud/
 
 > Ship in this order. Each phase produces a working `wails build`.
 
-| Order | Phase | Depends On | Deliverable |
-|---|---|---|---|
-| 1 | 1.1 Scanner | — | Typed scan results |
-| 2 | 1.6 Runner | 1.1 | Local dev server starts |
-| 3 | 1.2 + 1.3 Limiter | 1.6 | Process runs under resource caps |
-| 4 | 1.4 Tunnel | 1.6 | Real public URL appears |
-| 5 | 3.1 + 3.2 Log Pipeline | 1.6 | Logs stream to UI |
-| 6 | 4.1–4.5 UI Screens | 1–5 | Full UX journey |
-| 7 | 2.1 Keyring | — | Secrets stored securely |
-| 8 | 1.5 Vercel | 1.4, 2.1 | Env sync works |
-| 9 | 3.3 Resource Charts | 1.6, 6.1 | Live RAM/CPU graphs |
-| 10 | 5.1–5.3 Hardening | All | Anti-zombie, validation, IPC |
-| 11 | 6.1 System Info | — | Sliders know system limits |
+| # | Task | Phase | Depends On | Deliverable |
+|---|---|---|---|---|
+| 1 | Scanner + cache | P1 | — | Typed `ScanResult` with framework/port detection |
+| 2 | Validate (port, path, script) | P9 | — | Input validation functions |
+| 3 | System Info | P6 | — | RAM + CPU count for sliders |
+| 4 | Runner (dev server) | P1 | 1, 2 | `bun run dev` actually starts |
+| 5 | OS Limiter Windows | P2 | 4 | Job Objects restrict process |
+| 6 | OS Limiter Linux | P2 | 4 | cgroups/taskset/prlimit restrict process |
+| 7 | OOM detection | P2 | 4, 5, 6 | Exit code 137 triggers UI alert |
+| 8 | Process Guard | P9 | 4 | Anti-zombie: all PIDs tracked + killed on shutdown |
+| 9 | Log Pipe | P6 | 4 | 100ms batched log stream |
+| 10 | Resource Monitor | P6 | 4 | /proc or WinAPI polling every 1s |
+| 11 | cloudflared detection | P3 | — | Find binary in PATH or bundled |
+| 12 | Ephemeral Tunnel | P3 | 11 | Free domain URL appears |
+| 13 | Tunnel Reconnect | P3 | 12 | 5× retry with exponential backoff |
+| 14 | Keyring (DPAPI + D-Bus) | P5 | — | Secrets stored in OS keyring |
+| 15 | Vercel Sync (real HTTP) | P4 | 14 | Env variable updated + deploy triggered |
+| 16 | Permanent Tunnel (CF API) | P3 | 14 | Custom domain CNAME registered |
+| 17 | Config persistence | P8 | — | Last project + settings remembered |
+| 18 | Bun portable download | P1 | — | Bun downloaded to app data dir |
+| 19 | Drop-Zone screen | P7 | 1, 18 | Drag-drop + file picker + shake animation |
+| 20 | Control Panel screen | P7 | 3, 17 | Sliders, selectors, pre-filled config |
+| 21 | Launching screen | P7 | 4, 12, 15 | Progress stepper with event listeners |
+| 22 | Log Terminal component | P7 | 9 | Virtualized 1000-line ring buffer |
+| 23 | Resource Chart component | P7 | 10 | Recharts area chart with threshold |
+| 24 | OOM Modal component | P7 | 7 | Warning dialog with restart option |
+| 25 | Dashboard screen | P7 | 22, 23, 24 | URL card + charts + logs + stop button |
+| 26 | App state machine | P7 | 19–25 | Full UX journey wired together |
+| 27 | IPC hardening | P9 | — | WebView lockdown |
+| 28 | App bindings finalization | P10 | All | All Go functions exposed to frontend |
 
 ---
 
@@ -331,3 +1208,8 @@ localcloud/
 8. **Ring buffer** in frontend log state: `logs.slice(-1000)`.
 9. **Batch logs** from Go every 100ms, not per-line.
 10. **Validate ports** before use: `> 1024 && <= 65535`.
+11. **Secrets stay in Go.** Never expose `GetCredential` to the frontend WebView.
+12. **Close HTTP response bodies.** Always `defer resp.Body.Close()`.
+13. **Cache expensive operations.** Runtime detection, scanner results, system info.
+14. **Reuse slice capacity.** `batch = batch[:0]` instead of `batch = nil`.
+15. **Platform files.** Use `//go:build` tags, never `runtime.GOOS` switch in a single file for platform-heavy code.
