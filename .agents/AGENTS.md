@@ -2,6 +2,8 @@
 
 This repository contains **LocalCloud**, a minimalist self-hosting desktop engine designed to orchestrate reverse tunnels and control local OS resources. All AI coding assistants (including Antigravity, Claude Code, Cursor, Kimchi, OpenCode, and others) MUST adhere strictly to the rules and architecture outlined in this document.
 
+> **📋 Implementation Plan:** Before writing any feature code, read [IMPLEMENTATION_PLAN.md](file:///.agents/IMPLEMENTATION_PLAN.md) for the phased build order, file map, and ponytail rules.
+
 ---
 
 ## 🚀 1. SYSTEM OVERVIEW & STACK

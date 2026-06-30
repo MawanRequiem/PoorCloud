@@ -3,8 +3,11 @@
 When working in this workspace, you must adhere to the design and technical rules defined in:
 - [.agents/AGENTS.md](file:///.agents/AGENTS.md)
 
+**📋 Implementation Plan:** Before implementing any feature, read [.agents/IMPLEMENTATION_PLAN.md](file:///.agents/IMPLEMENTATION_PLAN.md) for the phased build order, file map, dependency graph, and ponytail constraints.
+
 Key constraints:
 - Single-binary Wails (Go 1.22+ & React 19 + TypeScript + TailwindCSS v4).
 - Go backend: strictly stdlib except gopsutil/wails. Safe command arguments, anti-zombie process group management, DPAPI/Secret Service keyring APIs.
 - React frontend: virtualized lists for logs, ring-buffer capped state (1000 items), Framer Motion and Recharts.
 - Git: Do NOT include `Co-authored-by` headers in Git commits.
+- ponytail: full is active. YAGNI → stdlib → native → one line → minimum that works.
