@@ -1,4 +1,4 @@
-export namespace engine {
+export namespace core {
 	
 	export class WindowBounds {
 	    x: number;
@@ -77,6 +77,29 @@ export namespace engine {
 		}
 	}
 	
+	export class SystemInfo {
+	    totalRamMB: number;
+	    cpuCores: number;
+	    os: string;
+	    arch: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SystemInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRamMB = source["totalRamMB"];
+	        this.cpuCores = source["cpuCores"];
+	        this.os = source["os"];
+	        this.arch = source["arch"];
+	    }
+	}
+
+}
+
+export namespace scanner {
+	
 	export class ScanResult {
 	    name: string;
 	    version: string;
@@ -109,24 +132,6 @@ export namespace engine {
 	        this.hasBun = source["hasBun"];
 	        this.bunVersion = source["bunVersion"];
 	        this.projectPath = source["projectPath"];
-	    }
-	}
-	export class SystemInfo {
-	    totalRamMB: number;
-	    cpuCores: number;
-	    os: string;
-	    arch: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SystemInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.totalRamMB = source["totalRamMB"];
-	        this.cpuCores = source["cpuCores"];
-	        this.os = source["os"];
-	        this.arch = source["arch"];
 	    }
 	}
 
