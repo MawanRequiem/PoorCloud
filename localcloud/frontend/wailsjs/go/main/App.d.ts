@@ -4,6 +4,12 @@ import {engine} from '../models';
 
 export function DeleteCredential(arg1:string,arg2:string):Promise<void>;
 
+export function DownloadBunPortable(arg1:string):Promise<string>;
+
+export function GetEngineStatus():Promise<Record<string, any>>;
+
+export function GetSystemInfo():Promise<engine.SystemInfo>;
+
 export function HasCredential(arg1:string,arg2:string):Promise<boolean>;
 
 export function LimitResources(arg1:number,arg2:number,arg3:number):Promise<void>;
@@ -12,7 +18,7 @@ export function LoadConfig():Promise<engine.AppConfig>;
 
 export function SaveConfig(arg1:engine.AppConfig):Promise<void>;
 
-export function ScanProject(arg1:string):Promise<Record<string, any>>;
+export function ScanProject(arg1:string):Promise<engine.ScanResult>;
 
 export function StartEphemeralTunnel(arg1:number):Promise<void>;
 
