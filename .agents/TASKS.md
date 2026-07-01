@@ -25,12 +25,12 @@ This document groups tasks by independent, end-to-end features so that two AI ag
   - [x] **T6:** Create `engine/os_limiter_linux.go` (systemd scope v2, cgroups v1, prlimit/taskset fallbacks)
   - [x] **T7:** Create `engine/processguard.go` (anti-zombie clean exit codes, process group cleanup)
   - [x] **T8:** Create `engine/bundler.go` (Download Bun portable ZIP, unpack via stdlib, chmod)
-- [ ] **Phase A3: Core UI Screens & Routing**
-  - [ ] **T9:** Create Wails Engine Bindings `app_engine.go` (exposes scan/run methods)
-  - [ ] **T10:** Create `DropZone.tsx` screen (drag-drop overlay, folder picker, error shake animation, install Bun banner)
-  - [ ] **T11:** Create `ControlPanel.tsx` screen (dynamic sliders, script selector, Vercel/Cloudflare custom inputs)
-  - [ ] **T12:** Create `OOMModal.tsx` component (Indonesian error modal blocking dashboard interaction)
-  - [ ] **T13:** Rewrite `App.tsx` state machine router with Framer Motion transitions
+- [x] **Phase A3: Core UI Screens & Routing**
+  - [x] **T9:** Create Wails Engine Bindings `app_engine.go` (exposes scan/run methods)
+  - [x] **T10:** Create `DropZone.tsx` screen (drag-drop overlay, folder picker, error shake animation, install Bun banner)
+  - [x] **T11:** Create `ControlPanel.tsx` screen (dynamic sliders, script selector, Vercel/Cloudflare custom inputs)
+  - [x] **T12:** Create `OOMModal.tsx` component (Indonesian error modal blocking dashboard interaction)
+  - [x] **T13:** Rewrite `App.tsx` state machine router with Framer Motion transitions
 
 ---
 

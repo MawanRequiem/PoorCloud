@@ -6,6 +6,18 @@ export function DeleteCredential(arg1, arg2) {
   return window['go']['main']['App']['DeleteCredential'](arg1, arg2);
 }
 
+export function DownloadBunPortable(arg1) {
+  return window['go']['main']['App']['DownloadBunPortable'](arg1);
+}
+
+export function GetEngineStatus() {
+  return window['go']['main']['App']['GetEngineStatus']();
+}
+
+export function GetSystemInfo() {
+  return window['go']['main']['App']['GetSystemInfo']();
+}
+
 export function HasCredential(arg1, arg2) {
   return window['go']['main']['App']['HasCredential'](arg1, arg2);
 }
