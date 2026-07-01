@@ -7,9 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	
 	"localcloud/engine"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -57,30 +55,4 @@ func (a *App) ScanProject(projectPath string) (map[string]interface{}, error) {
 // LimitResources bounds CPU and memory limits.
 func (a *App) LimitResources(pid int, memoryMb int64, cpuCores float64) error {
 	return engine.LimitResources(pid, memoryMb, cpuCores)
-}
-
-// StartTunnel runs Cloudflare Tunnel and emits progress back to the UI.
-// ponytail: Emits tunnel-status updates directly to the Wails React UI thread.
-func (a *App) StartTunnel(localPort int) error {
-	return engine.StartTunnel(a.ctx, localPort, func(status, url string, err error) {
-		errMsg := ""
-		if err != nil {
-			errMsg = err.Error()
-		}
-		wailsRuntime.EventsEmit(a.ctx, "tunnel-status", map[string]string{
-			"status": status,
-			"url":    url,
-			"error":  errMsg,
-		})
-	})
-}
-
-// StopTunnel stops the reverse tunnel.
-func (a *App) StopTunnel() {
-	engine.StopTunnel()
-}
-
-// SyncVercel triggers env and deployment synchronization with Vercel API.
-func (a *App) SyncVercel(token, projectId, teamId, envKey, value string) error {
-	return engine.SyncVercelEnv(a.ctx, token, projectId, teamId, envKey, value)
 }
