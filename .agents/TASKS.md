@@ -15,16 +15,16 @@ This document groups tasks by independent, end-to-end features so that two AI ag
 ## ⚡ FEATURE TRACK A: Core Engine & Project Launcher (Agent 1)
 *Focuses on directories scan, runtimes installer, sliders inputs, process running, resource limiters, and setup screens.*
 
-- [ ] **Phase A1: Scanning & Validation**
-  - [ ] **T1:** Create `engine/scanner.go` (extract scripts, framework, port & memory cache)
-  - [ ] **T2:** Create `engine/sysinfo.go` (read system CPU cores and physical memory)
-  - [ ] **T3:** Create `engine/validate.go` (validate port bounds, clean path traversals, whitelist script keys)
-- [ ] **Phase A2: Local Process Controller & Limits**
-  - [ ] **T4:** Create `engine/runner.go` (spawn subprocess with multi-pipe logging, OOM tracking)
-  - [ ] **T5:** Create `engine/os_limiter_windows.go` (Windows Job Objects memory & CPU limits)
-  - [ ] **T6:** Create `engine/os_limiter_linux.go` (systemd scope v2, cgroups v1, prlimit/taskset fallbacks)
-  - [ ] **T7:** Create `engine/processguard.go` (anti-zombie clean exit codes, process group cleanup)
-  - [ ] **T8:** Create `engine/bundler.go` (Download Bun portable ZIP, unpack via stdlib, chmod)
+- [x] **Phase A1: Scanning & Validation**
+  - [x] **T1:** Create `engine/scanner.go` (extract scripts, framework, port & memory cache)
+  - [x] **T2:** Create `engine/sysinfo.go` (read system CPU cores and physical memory)
+  - [x] **T3:** Create `engine/validate.go` (validate port bounds, clean path traversals, whitelist script keys)
+- [x] **Phase A2: Local Process Controller & Limits**
+  - [x] **T4:** Create `engine/runner.go` (spawn subprocess with multi-pipe logging, OOM tracking)
+  - [x] **T5:** Create `engine/os_limiter_windows.go` (Windows Job Objects memory & CPU limits)
+  - [x] **T6:** Create `engine/os_limiter_linux.go` (systemd scope v2, cgroups v1, prlimit/taskset fallbacks)
+  - [x] **T7:** Create `engine/processguard.go` (anti-zombie clean exit codes, process group cleanup)
+  - [x] **T8:** Create `engine/bundler.go` (Download Bun portable ZIP, unpack via stdlib, chmod)
 - [ ] **Phase A3: Core UI Screens & Routing**
   - [ ] **T9:** Create Wails Engine Bindings `app_engine.go` (exposes scan/run methods)
   - [ ] **T10:** Create `DropZone.tsx` screen (drag-drop overlay, folder picker, error shake animation, install Bun banner)
@@ -37,21 +37,21 @@ This document groups tasks by independent, end-to-end features so that two AI ag
 ## ⚡ FEATURE TRACK B: Tunnels, Sync & Telemetry Dashboard (Agent 2)
 *Focuses on secure keyring storage, Cloudflare reverse tunnels, Vercel REST integrations, log batching pipelines, telemetry monitors, and live dashboards.*
 
-- [ ] **Phase B1: Secure Storage & REST Syncer**
-  - [ ] **T14:** Create `engine/keyring.go` & `keyring_*.go` (Windows DPAPI, Linux D-Bus Secret Service, local AES fallback)
-  - [ ] **T15:** Create `engine/vercel.go` (patch environment variables, trigger rebuilds, error mapping)
-  - [ ] **T16:** Create `engine/config.go` (JSON storage for UI size, last project path, settings)
-- [ ] **Phase B2: Reverse Tunnel Managers**
-  - [ ] **T17:** Create `engine/tunnel.go` (cloudflared sniffer, Ephemeral Tunnel stdout/stderr URL regex parsing)
-  - [ ] **T18:** Implement Auto-Reconnect loop (5 attempts with exponential backoff)
-  - [ ] **T19:** Create `engine/tunnel_api.go` (Cloudflare API v4 DNS CNAME configuration)
-- [ ] **Phase B3: Log Pipes & Real-time Graphs**
-  - [ ] **T20:** Create `engine/logpipe.go` (Log Batcher using 100ms ticks, slice memory reuse)
-  - [ ] **T21:** Create `engine/monitor.go` (direct /proc parsing and WinAPI memory checks every 1s)
-  - [ ] **T22:** Create Wails Telemetry Bindings `app_telemetry.go` (exposes tunnel/vercel/keyring/config methods)
-  - [ ] **T23:** Create `LogTerminal.tsx` component (1000-line ring buffer, react-window virtualizer, keyword colors)
-  - [ ] **T24:** Create `ResourceChart.tsx` component (Recharts Area charts, 60-point circular window)
-  - [ ] **T25:** Create `Dashboard.tsx` screen (glass-morphism URL card, charts/terminal panel, stop button)
+- [x] **Phase B1: Secure Storage & REST Syncer**
+  - [x] **T14:** Create `engine/keyring.go` & `keyring_*.go` (Windows DPAPI, Linux D-Bus Secret Service, local AES fallback)
+  - [x] **T15:** Create `engine/vercel.go` (patch environment variables, trigger rebuilds, error mapping)
+  - [x] **T16:** Create `engine/config.go` (JSON storage for UI size, last project path, settings)
+- [x] **Phase B2: Reverse Tunnel Managers**
+  - [x] **T17:** Create `engine/tunnel.go` (cloudflared sniffer, Ephemeral Tunnel stdout/stderr URL regex parsing)
+  - [x] **T18:** Implement Auto-Reconnect loop (5 attempts with exponential backoff)
+  - [x] **T19:** Create `engine/tunnel_api.go` (Cloudflare API v4 DNS CNAME configuration)
+- [x] **Phase B3: Log Pipes & Real-time Graphs**
+  - [x] **T20:** Create `engine/logpipe.go` (Log Batcher using 100ms ticks, slice memory reuse)
+  - [x] **T21:** Create `engine/monitor.go` (direct /proc parsing and WinAPI memory checks every 1s)
+  - [x] **T22:** Create Wails Telemetry Bindings `app_telemetry.go` (exposes tunnel/vercel/keyring/config methods)
+  - [x] **T23:** Create `LogTerminal.tsx` component (1000-line ring buffer, react-window virtualizer, keyword colors)
+  - [x] **T24:** Create `ResourceChart.tsx` component (Recharts Area charts, 60-point circular window)
+  - [x] **T25:** Create `Dashboard.tsx` screen (glass-morphism URL card, charts/terminal panel, stop button)
 
 ---
 
