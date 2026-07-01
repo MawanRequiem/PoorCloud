@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-
-	"localcloud/engine"
+	"localcloud/engine/scanner"
+	"localcloud/engine/process"
 )
 
 // App struct
@@ -23,12 +23,12 @@ func (a *App) startup(ctx context.Context) {
 }
 
 // ScanProject delegates to the engine scanner for framework/port/runtime detection.
-// ponytail: delegates to engine.ScanProject, returns typed result.
-func (a *App) ScanProject(projectPath string) (*engine.ScanResult, error) {
-	return engine.ScanProject(projectPath)
+// ponytail: delegates to scanner.ScanProject, returns typed result.
+func (a *App) ScanProject(projectPath string) (*scanner.ScanResult, error) {
+	return scanner.ScanProject(projectPath)
 }
 
 // LimitResources bounds CPU and memory limits for a running process.
 func (a *App) LimitResources(pid int, memoryMb int64, cpuCores float64) error {
-	return engine.LimitResources(pid, memoryMb, cpuCores)
+	return process.LimitResources(pid, memoryMb, cpuCores)
 }

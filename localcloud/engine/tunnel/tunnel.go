@@ -1,4 +1,4 @@
-package engine
+package tunnel
 
 import (
 	"bufio"
@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"localcloud/engine/core"
 )
 
 var (
@@ -123,7 +124,7 @@ func startCloudflaredProcess(ctx context.Context, localPort int, onStatus func(s
 	cmd := exec.CommandContext(ctx, binPath, args...)
 
 	// Configure platform-specific attributes to protect against zombies
-	setPlatformSysProcAttr(cmd)
+	core.SetPlatformSysProcAttr(cmd)
 
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {

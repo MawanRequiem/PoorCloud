@@ -1,4 +1,4 @@
-package engine
+package tunnel
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"localcloud/engine/core"
 )
 
 type TunnelConfig struct {
@@ -255,7 +256,7 @@ func StartPermanentTunnel(ctx context.Context, cfg TunnelConfig, onStatus func(s
 
 	cmdArgs := []string{"tunnel", "run", "--credentials-file", credsFile, cfg.TunnelName}
 	cmd := exec.CommandContext(runCtx, binPath, cmdArgs...)
-	setPlatformSysProcAttr(cmd)
+	core.SetPlatformSysProcAttr(cmd)
 
 	permMu.Lock()
 	permCmd = cmd

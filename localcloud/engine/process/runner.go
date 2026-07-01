@@ -1,4 +1,4 @@
-package engine
+package process
 
 import (
 	"bufio"
@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"localcloud/engine/core"
 )
 
 // ponytail: one file, one RunConfig struct, one RunDevServer function. The glue between scanner, limiter, and tunnel.
@@ -40,10 +41,10 @@ const logChanBuffer = 512
 
 // RunDevServer launches the dev server, pipes logs, applies resource limits, and monitors exit.
 func RunDevServer(ctx context.Context, cfg RunConfig, onEvent func(event string, data interface{})) (*RunningProcess, error) {
-	if err := ValidatePort(cfg.Port); err != nil {
+	if err := core.ValidatePort(cfg.Port); err != nil {
 		return nil, err
 	}
-	if err := ValidatePath(cfg.ProjectPath); err != nil {
+	if err := core.ValidatePath(cfg.ProjectPath); err != nil {
 		return nil, err
 	}
 

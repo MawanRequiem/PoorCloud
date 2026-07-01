@@ -1,6 +1,6 @@
 //go:build windows
 
-package engine
+package core
 
 import (
 	"syscall"

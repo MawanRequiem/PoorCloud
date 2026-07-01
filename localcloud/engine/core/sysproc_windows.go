@@ -1,9 +1,9 @@
 //go:build windows
 
-package engine
+package core
 
 import "os/exec"
 
-func setPlatformSysProcAttr(cmd *exec.Cmd) {
+func SetPlatformSysProcAttr(cmd *exec.Cmd) {
 	// Job Objects handle process grouping on Windows, so we do nothing here.
 }

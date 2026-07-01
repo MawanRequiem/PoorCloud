@@ -1,6 +1,6 @@
 //go:build !linux
 
-package engine
+package process
 
 // applyLinuxLimits is a stub for non-Linux builds.
 func applyLinuxLimits(pid int, memMB int64, cpuCores float64) error {

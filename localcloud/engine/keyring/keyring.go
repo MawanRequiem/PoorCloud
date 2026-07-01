@@ -1,4 +1,4 @@
-package engine
+package keyring
 
 // StoreSecret stores a credential securely.
 func StoreSecret(service, key, value string) error {

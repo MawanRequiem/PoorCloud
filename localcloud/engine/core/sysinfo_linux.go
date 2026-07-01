@@ -1,6 +1,6 @@
 //go:build linux
 
-package engine
+package core
 
 // callGlobalMemoryStatusEx is not used on Linux; ram is read from /proc/meminfo.
 func callGlobalMemoryStatusEx() int64 {

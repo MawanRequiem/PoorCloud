@@ -1,14 +1,16 @@
 package main
 
 import (
-	"localcloud/engine"
-
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"localcloud/engine/core"
+	"localcloud/engine/keyring"
+	"localcloud/engine/tunnel"
+	"localcloud/engine/vercel"
 )
 
 // StartEphemeralTunnel starts the free Cloudflare tunnel and emits status to frontend
 func (a *App) StartEphemeralTunnel(localPort int) error {
-	return engine.StartTunnel(a.ctx, localPort, func(status, url string, err error) {
+	return tunnel.StartTunnel(a.ctx, localPort, func(status, url string, err error) {
 		errMsg := ""
 		if err != nil {
 			errMsg = err.Error()
@@ -23,14 +25,14 @@ func (a *App) StartEphemeralTunnel(localPort int) error {
 
 // StartPermanentTunnel starts a named Cloudflare tunnel with custom CNAME
 func (a *App) StartPermanentTunnel(localPort int, domain, accountID, apiToken, tunnelName string) error {
-	cfg := engine.TunnelConfig{
+	cfg := tunnel.TunnelConfig{
 		LocalPort:  localPort,
 		Domain:     domain,
 		AccountID:  accountID,
 		APIToken:   apiToken,
 		TunnelName: tunnelName,
 	}
-	return engine.StartPermanentTunnel(a.ctx, cfg, func(status, url string, err error) {
+	return tunnel.StartPermanentTunnel(a.ctx, cfg, func(status, url string, err error) {
 		errMsg := ""
 		if err != nil {
 			errMsg = err.Error()
@@ -45,37 +47,37 @@ func (a *App) StartPermanentTunnel(localPort int, domain, accountID, apiToken, t
 
 // StopTunnel stops any running tunnel
 func (a *App) StopTunnel() {
-	engine.StopTunnel()
-	engine.StopPermanentTunnel()
+	tunnel.StopTunnel()
+	tunnel.StopPermanentTunnel()
 }
 
-// SyncVercel wraps engine.SyncVercelEnv
+// SyncVercel wraps vercel.SyncVercelEnv
 func (a *App) SyncVercel(token, projectId, teamId, envKey, value string) error {
-	return engine.SyncVercelEnv(a.ctx, token, projectId, teamId, envKey, value)
+	return vercel.SyncVercelEnv(a.ctx, token, projectId, teamId, envKey, value)
 }
 
 // StoreCredential saves a token in the secure OS keyring
 func (a *App) StoreCredential(service, key, value string) error {
-	return engine.StoreSecret(service, key, value)
+	return keyring.StoreSecret(service, key, value)
 }
 
 // HasCredential checks if a credential exists in the keyring
 func (a *App) HasCredential(service, key string) bool {
-	_, err := engine.GetSecret(service, key)
+	_, err := keyring.GetSecret(service, key)
 	return err == nil
 }
 
 // DeleteCredential removes a token from the secure OS keyring
 func (a *App) DeleteCredential(service, key string) error {
-	return engine.DeleteSecret(service, key)
+	return keyring.DeleteSecret(service, key)
 }
 
 // LoadConfig reads the persisted JSON configuration
-func (a *App) LoadConfig() (*engine.AppConfig, error) {
-	return engine.LoadConfig()
+func (a *App) LoadConfig() (*core.AppConfig, error) {
+	return core.LoadConfig()
 }
 
 // SaveConfig writes the persistent configuration
-func (a *App) SaveConfig(cfg engine.AppConfig) error {
-	return engine.SaveConfig(&cfg)
+func (a *App) SaveConfig(cfg core.AppConfig) error {
+	return core.SaveConfig(&cfg)
 }
