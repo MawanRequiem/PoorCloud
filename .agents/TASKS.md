@@ -58,6 +58,6 @@ This document groups tasks by independent, end-to-end features so that two AI ag
 ## 🔗 TRACK C: Hardening & Final QA (Coordinated)
 *To be completed after Track A & B are fully green.*
 
-- [ ] **T26:** Create `Launching.tsx` screen (stepper indicator waiting on backend confirmation events)
-- [ ] **T27:** Implement IPC WebView2 hardening options in Wails initialization (`main.go`)
-- [ ] **T28:** Connect final bindings in `main.go` and verify full system build (`wails build`)
+- [x] **T26:** Create `Launching.tsx` screen (stepper indicator waiting on backend confirmation events)
+- [x] **T27:** Implement IPC WebView2 hardening options in Wails initialization (`main.go`)
+- [x] **T28:** Connect final bindings in `main.go` and verify full system build (`wails build`)
