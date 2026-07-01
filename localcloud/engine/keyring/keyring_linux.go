@@ -243,8 +243,7 @@ func decryptAES(ciphertext []byte) (string, error) {
 		return "", fmt.Errorf("ciphertext too short")
 	}
 	nonce := ciphertext[:gcm.NonceSize()]
-	actualCiphertext := ciphertext[gcm.NonceSize()]
-	plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext[gcm.NonceSize():], nil)
 	if err != nil {
 		return "", err
 	}

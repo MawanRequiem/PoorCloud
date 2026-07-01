@@ -150,9 +150,6 @@ func startCloudflaredProcess(ctx context.Context, localPort int, onStatus func(s
 		scanner := bufio.NewScanner(stderrPipe)
 		for scanner.Scan() {
 			line := scanner.Text()
-			// Forward logs to standard output for logging pipe
-			fmt.Printf("[cloudflared] %s\n", line)
-			
 			if match := urlRegex.FindString(line); match != "" {
 				select {
 				case urlChan <- match:

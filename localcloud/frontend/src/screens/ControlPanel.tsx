@@ -160,7 +160,10 @@ export function ControlPanel({ scan, onGoLive }: ControlPanelProps) {
                 min={1025}
                 max={65535}
                 value={config.port}
-                onChange={(e) => update({ port: parseInt(e.target.value) || 3000 })}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  update({ port: !isNaN(val) && val > 0 ? val : 3000 });
+                }}
                 className="w-full bg-[#111827] border border-[#1f2937] rounded-lg px-3 py-2 text-sm font-mono text-[#f3f4f6] outline-none focus:border-[#6366f1] transition-colors"
               />
             </div>
