@@ -31,6 +31,13 @@ This document groups tasks by independent, end-to-end features so that two AI ag
   - [x] **T11:** Create `ControlPanel.tsx` screen (dynamic sliders, script selector, Vercel/Cloudflare custom inputs)
   - [x] **T12:** Create `OOMModal.tsx` component (Indonesian error modal blocking dashboard interaction)
   - [x] **T13:** Rewrite `App.tsx` state machine router with Framer Motion transitions
+- [ ] **Phase A4: Multi-Project Hub & Dashboard-First Flow**
+  - [ ] **T29:** Create `engine/projects/project.go` (Project struct, registry singleton, lifecycle functions)
+  - [ ] **T30:** Rewrite `Dashboard.tsx` as landing screen (project grid, status cards, per-project mini-charts)
+  - [ ] **T31:** Create `ProjectCard.tsx` component (project status, port, URL, mini status dot, stop/start controls)
+  - [ ] **T32:** Create `AddProjectModal.tsx` (embeds DropZone → ControlPanel → Launching as a modal flow)
+  - [ ] **T33:** Rewrite `App.tsx` as dashboard-first state machine (landing = dashboard, add-project as modal)
+  - [ ] **T34:** Create `app_projects.go` (Wails bindings for project registry: ListProjects, StartProject, StopProject, RemoveProject)
 
 ---
 
@@ -52,6 +59,11 @@ This document groups tasks by independent, end-to-end features so that two AI ag
   - [x] **T23:** Create `LogTerminal.tsx` component (1000-line ring buffer, react-window virtualizer, keyword colors)
   - [x] **T24:** Create `ResourceChart.tsx` component (Recharts Area charts, 60-point circular window)
   - [x] **T25:** Create `Dashboard.tsx` screen (glass-morphism URL card, charts/terminal panel, stop button)
+- [ ] **Phase B4: Per-Project Resource Isolation**
+  - [ ] **T35:** Refactor `engine/tunnel/tunnel.go` for per-project tunnel instances (remove global singleton state)
+  - [ ] **T36:** Refactor `engine/process/monitor.go` for per-project resource polling (key monitors by projectID)
+  - [ ] **T37:** Refactor `engine/process/logpipe.go` for per-project log streams (key log channels by projectID)
+  - [ ] **T38:** Update `app_telemetry.go` for project-aware tunnel bindings (pass projectID through all calls)
 
 ---
 

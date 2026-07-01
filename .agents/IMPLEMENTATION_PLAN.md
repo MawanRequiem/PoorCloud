@@ -640,137 +640,115 @@ type SystemInfo struct {
 
 ---
 
-## Phase 7: Frontend — Complete UX Journey
+## Phase 7: Frontend — Complete UX Journey (Dashboard-First, Multi-Project)
 
-### 7.1 App State Machine [F25–F29]
+**Key design change:** The Dashboard is now the **landing page**, not the final destination. DropZone, ControlPanel, and Launching are embedded in a modal flow for adding new projects.
+
+### 7.1 App State Machine — Dashboard First [F25–F29] [REWRITE]
 
 **File:** `localcloud/frontend/src/App.tsx` [REWRITE]
 
 ```tsx
-type AppScreen = "dropzone" | "control" | "launching" | "dashboard"
+type AppScreen = "dashboard" // single primary screen
+// DropZone → ControlPanel → Launching is a modal flow within dashboard
 
 function App() {
-  const [screen, setScreen] = useState<AppScreen>("dropzone")
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
-  const [tunnelURL, setTunnelURL] = useState("")
-  const [runConfig, setRunConfig] = useState<RunConfig | null>(null)
+  const [projects, setProjects] = useState<ProjectState[]>([])
+  const [addProjectOpen, setAddProjectOpen] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<string | null>(null)
 
   return (
-    <AnimatePresence mode="wait">
-      {screen === "dropzone" && <DropZone onScanned={(r) => { setScanResult(r); setScreen("control") }} />}
-      {screen === "control" && <ControlPanel scan={scanResult!} onGoLive={(cfg) => { setRunConfig(cfg); setScreen("launching") }} />}
-      {screen === "launching" && <Launching config={runConfig!} onComplete={(url) => { setTunnelURL(url); setScreen("dashboard") }} />}
-      {screen === "dashboard" && <Dashboard tunnelURL={tunnelURL} onStop={() => { setScreen("dropzone") }} />}
-    </AnimatePresence>
+    <>
+      <Dashboard
+        projects={projects}
+        onAddProject={() => setAddProjectOpen(true)}
+        onSelectProject={(id) => setSelectedProject(id)}
+      />
+      <AddProjectModal
+        open={addProjectOpen}
+        onComplete={(project) => {
+          setProjects(prev => [...prev, project])
+          setAddProjectOpen(false)
+        }}
+        onClose={() => setAddProjectOpen(false)}
+      />
+      <OOMModal ... />
+    </>
   )
 }
 ```
 
-### 7.2 Screen 1: Drop-Zone [F25, F26]
+### 7.2 Screen 1: Dashboard (Landing Page) [F29] [REWRITE]
 
-**File:** `localcloud/frontend/src/screens/DropZone.tsx` [NEW]
-
-**Implementation details:**
-- Full-screen dark background with centered dashed border drop area
-- Use Wails runtime `OnFileDrop` for native drag-and-drop support:
-  ```tsx
-  useEffect(() => {
-    OnFileDrop((x, y, paths) => {
-      if (paths.length > 0) handleFolderSelect(paths[0])
-    }, true)
-    return () => OnFileDropOff()
-  }, [])
-  ```
-- "Browse Folder" button using Wails `OpenDirectoryDialog`:
-  ```tsx
-  import { OpenDirectoryDialog } from "../wailsjs/go/main/App"
-  ```
-  (Need to add `OpenDirectoryDialog` binding in `app.go`)
-- On folder select → call `ScanProject(path)`
-- **If valid:** Transition to control screen with Framer Motion `exit={{ opacity: 0, y: -20 }}`
-- **If invalid (no package.json):**
-  - Shake animation: `animate={{ x: [0, -10, 10, -10, 10, 0] }}` with `transition={{ duration: 0.4 }}`
-  - Red border flash
-  - Error text: *"Berkas package.json tidak ditemukan. Pastikan Anda memilih root folder project JavaScript Anda."*
-- **If no runtime detected:**
-  - Amber warning banner: *"Runtime Tidak Terdeteksi. Klik di sini untuk mengunduh Bun portabel otomatis ke dalam aplikasi."*
-  - Download button calls `DownloadBunPortable` binding
-  - Show download progress bar
-
-### 7.3 Screen 2: Control Panel [F27]
-
-**File:** `localcloud/frontend/src/screens/ControlPanel.tsx` [NEW]
+**File:** `localcloud/frontend/src/screens/Dashboard.tsx` [REWRITE]
 
 **Implementation details:**
-- **Project info card:** Name, framework badge, runtime detected
-- **Script selector:** Dropdown populated from `scanResult.scripts`, pre-selected to `scanResult.devCommand`
-- **Port input:** Number input, pre-filled with `scanResult.defaultPort`, validated client-side (1025–65535)
-- **RAM slider:**
-  - Min: 128 MB
-  - Max: system total RAM (fetched from `GetSystemInfo()`)
-  - Step: 128 MB
-  - Visual: Tailwind slider with gradient track (green → amber → red)
-  - Label shows current value in MB
-- **CPU cores selector:**
-  - Buttons/chips for 1, 2, 3, ... N cores (N from `GetSystemInfo().cpuCores`)
-  - Selected state highlighted
-- **Vercel sync toggle:**
-  - Off by default
-  - When toggled on, expand to show:
-    - Vercel API token input (password type, stored in keyring on submit)
-    - Project ID input
-    - Team ID input (optional)
-    - Env variable key input (default: `"NEXT_PUBLIC_API_URL"`)
-- **Cloudflare mode selector:**
-  - "Free Domain (Ephemeral)" — default, no config needed
-  - "Custom Domain (Permanent)" — shows API token, account ID, domain inputs
-- **"GO LIVE" button:**
-  - Full-width green gradient button at bottom
-  - Disabled until all required fields are valid
-  - On click → transition to launching screen
+- **Landing page** of the application — shown immediately on launch
+- **Header:** "LocalCloud" title, "Add New Project" button (prominent, indigo)
+- **Project Grid:** Responsive card grid (`repeat(auto-fit, minmax(320px, 1fr))`) showing all managed projects
+- **Each Project Card:**
+  - Project name, framework badge, version
+  - Status indicator dot (green = running, amber = launching, gray = stopped, red = error)
+  - Port number and tunnel URL (truncated with copy button)
+  - RAM/CPU mini sparkline charts (60-second window, compact height)
+  - Action buttons: Stop (red), Start (green), Remove (gray, with confirmation)
+- **Empty State:** Centered message "Belum ada project. Klik 'Add Project' untuk memulai." with a large icon and CTA button
+- **Selected/Expanded State:** Clicking a running project card expands it to full detail view (large charts, log terminal, URL card with copy/open)
+- **Framer Motion:** `AnimatePresence` for card enter/exit, `layoutId` for expand/collapse transitions
 
-### 7.4 Screen 3: Launching [F28]
+### 7.3 AddProjectModal (DropZone + ControlPanel + Launching) [F25, F26, F27, F28]
 
-**File:** `localcloud/frontend/src/screens/Launching.tsx` [NEW]
+**File:** `localcloud/frontend/src/components/AddProjectModal.tsx` [NEW]
 
 **Implementation details:**
-- Vertical stepper with 3–4 steps, each with animated icon:
-  1. **"Memulai server lokal..."** → calls `RunDevServer` binding
-     - Listens for `process-started` event → marks complete
-  2. **"Menerapkan batasan resource..."** → already applied by runner
-     - Marks complete immediately after step 1
-  3. **"Membuka terowongan aman..."** → calls `StartTunnel` binding
-     - Listens for `tunnel-status` == `CONNECTED` → marks complete
-  4. **"Menyelaraskan Vercel..."** → calls `SyncVercel` binding (only if enabled)
-     - Awaits Promise resolution → marks complete
-- Each step: circle icon → spinner while in progress → green checkmark when done → red X on error
-- Framer Motion `layoutId` transitions for smooth step animations
-- On all complete → auto-transition to dashboard after 500ms delay
-- On error → show error message with "Retry" button for that specific step
+- Full-screen modal overlay (`fixed inset-0 z-300`) with dark backdrop (`bg-black/80 backdrop-blur-sm`)
+- Embeds a 3-step flow using internal state:
+  1. **DropZone step:** Full-screen dark background with centered dashed border drop area
+     - Use Wails runtime `OnFileDrop` for native drag-and-drop
+     - "Browse Folder" button (or manual path input)
+     - On folder select → call `ScanProject(path)`
+     - **If invalid:** Shake animation + error text: *"Berkas package.json tidak ditemukan..."*
+     - **If no runtime:** Amber warning banner with Bun download button + progress bar
+  2. **Control Panel step:** Project info card, script selector, port input, RAM slider, CPU cores, Vercel sync toggle, Cloudflare mode selector, "GO LIVE" button
+  3. **Launching step:** Vertical stepper with animated icons (server start → resource limits → tunnel → Vercel sync)
+- **On success:** Modal closes, new project appears in Dashboard grid
+- **On cancel/close:** Returns to Dashboard with no changes
 
-### 7.5 Screen 4: Live Dashboard [F29]
+### 7.4 Project Card Component
 
-**File:** `localcloud/frontend/src/screens/Dashboard.tsx` [NEW]
+**File:** `localcloud/frontend/src/components/ProjectCard.tsx` [NEW]
 
 **Implementation details:**
-- **Top bar:** Status indicator dot + "LocalCloud" text + uptime counter
-- **URL Card:**
-  - Glass-morphism card with the public URL
-  - Copy button using `ClipboardSetText(url)` from Wails runtime
-  - "Open in Browser" button using `BrowserOpenURL(url)` from Wails runtime
+```tsx
+interface ProjectCardProps {
+  project: ProjectState
+  onStart: (id: string) => void
+  onStop: (id: string) => void
+  onRemove: (id: string) => void
+  onSelect: (id: string) => void
+}
+```
+- Compact card with project identity, status, port, tunnel URL, mini sparklines
+- Green/amber/gray/red status dot using StatusDot component
+- RAM usage mini sparkline (Recharts AreaChart, 100px wide, no axes)
+- CPU usage mini sparkline (same, different color)
+- Stop/Start icon buttons, Remove (trash) icon button with confirmation tooltip
+- Click to expand for full detail view
+
+### 7.5 Live Dashboard Detail View [F29]
+
+**File:** Embedded in `Dashboard.tsx` when a project card is expanded
+
+**Implementation details:**
+- **Expanded panel** below the clicked project card (or as a side panel on wide screens)
+- **URL Card:** Glass-morphism card with public URL, Copy button, "Open in Browser" button
   - Green glow border when connected, gray when reconnecting
-- **Resource Charts (middle):**
-  - Two side-by-side `ResourceChart` components (RAM + CPU)
-  - Recharts `AreaChart` with smooth gradient fill
-  - Red dashed threshold line at the user-set limit
-  - 60-second scrolling window (last 60 data points at 1s interval)
-- **Log Terminal (bottom):**
-  - Full-width `LogTerminal` component
-  - Takes 50% of remaining height
-  - Scrollable with virtualization
-- **Floating controls:**
-  - Red "STOP" button (fixed bottom-right, with Framer Motion scale animation)
-  - On click: calls `StopServer`, `StopTunnel`, transitions back to dropzone
+- **Resource Charts (middle):** Two side-by-side ResourceChart components (RAM + CPU)
+  - Recharts AreaChart with gradient fill, red dashed threshold line at user-set limit
+  - 60-second scrolling window
+- **Log Terminal (bottom):** Full-width LogTerminal component, takes 50% of remaining height
+  - Virtualized with react-window, 1000-line ring buffer
+- **Floating controls:** Red "STOP" button (fixed bottom-right)
 
 ### 7.6 Log Terminal Component [F17, F18]
 
@@ -778,46 +756,22 @@ function App() {
 
 **Implementation details:**
 ```tsx
-function LogTerminal() {
+function LogTerminal({ projectID }: { projectID: string }) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const listRef = useRef<FixedSizeList>(null)
   const [autoScroll, setAutoScroll] = useState(true)
 
   useEffect(() => {
-    const unsub = EventsOn("process-log", (batch: string[]) => {
+    const unsub = EventsOn("process-log", (data: { projectID: string; lines: string[] }) => {
+      if (data.projectID !== projectID) return
       setLogs(prev => {
-        const newLogs = [...prev, ...batch.map(line => parseLogLine(line))]
-        return newLogs.slice(-1000) // Ring buffer: max 1000 entries
+        const newLogs = [...prev, ...data.lines.map(line => parseLogLine(line))]
+        return newLogs.slice(-1000)
       })
     })
     return unsub
-  }, [])
-
-  // Auto-scroll to bottom when new logs arrive (unless user scrolled up)
-  useEffect(() => {
-    if (autoScroll && listRef.current) {
-      listRef.current.scrollToItem(logs.length - 1)
-    }
-  }, [logs, autoScroll])
-
-  return (
-    <FixedSizeList
-      ref={listRef}
-      height={400}
-      width="100%"
-      itemCount={logs.length}
-      itemSize={24}
-      onScroll={({ scrollOffset, scrollUpdateWasRequested }) => {
-        if (!scrollUpdateWasRequested) {
-          // User manually scrolled — check if at bottom
-          const isAtBottom = scrollOffset >= (logs.length * 24 - 400 - 48)
-          setAutoScroll(isAtBottom)
-        }
-      }}
-    >
-      {({ index, style }) => <LogLine style={style} entry={logs[index]} />}
-    </FixedSizeList>
-  )
+  }, [projectID])
+  // ... rest of virtualized list with auto-scroll
 }
 ```
 
@@ -834,39 +788,28 @@ function LogTerminal() {
 
 **Implementation details:**
 ```tsx
-function ResourceChart({ type, limit }: { type: "ram" | "cpu", limit: number }) {
+function ResourceChart({ type, limit, projectID }: { type: "ram" | "cpu", limit: number, projectID: string }) {
   const [data, setData] = useState<DataPoint[]>([])
 
   useEffect(() => {
-    const unsub = EventsOn("resource-usage", (usage) => {
-      setData(prev => {
-        const point = {
-          time: new Date(usage.timestamp).toLocaleTimeString(),
-          value: type === "ram" ? usage.ramMB : usage.cpuPercent,
-        }
-        return [...prev, point].slice(-60) // 60 second window
-      })
+    const unsub = EventsOn("resource-usage", (data: { projectID: string; ramMB: number; cpuPercent: number; timestamp: number }) => {
+      if (data.projectID !== projectID) return
+      // ... update 60-point window
     })
     return unsub
-  }, [type])
-
-  return (
-    <AreaChart data={data} width={360} height={200}>
-      <defs>
-        <linearGradient id={`gradient-${type}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stopColor={type === "ram" ? "#6366f1" : "#10b981"} stopOpacity={0.8}/>
-          <stop offset="95%" stopColor={type === "ram" ? "#6366f1" : "#10b981"} stopOpacity={0}/>
-        </linearGradient>
-      </defs>
-      <Area type="monotone" dataKey="value" stroke={type === "ram" ? "#6366f1" : "#10b981"} fill={`url(#gradient-${type})`} />
-      {/* Red threshold line */}
-      <ReferenceLine y={limit} stroke="#ef4444" strokeDasharray="5 5" label={{ value: "Limit", fill: "#ef4444" }} />
-      <XAxis dataKey="time" tick={{ fontSize: 10, fill: "#6b7280" }} />
-      <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} />
-      <Tooltip />
-    </AreaChart>
-  )
+  }, [type, projectID])
+  // ... Recharts AreaChart with gradient fill and threshold line
 }
+```
+
+### 7.8 OOM Modal [F8]
+
+**File:** `localcloud/frontend/src/components/OOMModal.tsx` [KEEP, unchanged]
+
+- Warning icon + amber/red gradient background
+- Indonesian text: *"Server Lokal Terhenti: Penggunaan memori melewati batas..."*
+- "Restart" button + "Change Settings" button
+- Modal blocks interaction with the rest of the UI
 ```
 
 ---
@@ -1122,38 +1065,61 @@ func (a *App) DownloadBunPortable() error  // emits progress events
 ```
 localcloud/
 ├── main.go                          [MODIFY] — OnShutdown, IPC hardening
-├── app.go                           [REWRITE] — all bindings listed above
+├── app.go                           [KEEP]   — base App struct, ScanProject, LimitResources
+├── app_engine.go                    [KEEP]   — GetSystemInfo, DownloadBunPortable
+├── app_telemetry.go                 [KEEP]   — tunnel/vercel/keyring/config bindings
+├── app_projects.go                  [NEW]    — project registry bindings (ListProjects, StartProject, StopProject, RemoveProject)
 ├── engine/
-│   ├── scanner.go                   [NEW]    — project scanner + cache
-│   ├── runner.go                    [NEW]    — dev server process launcher
-│   ├── processguard.go              [NEW]    — anti-zombie PID tracker
-│   ├── os_limiter.go                [KEEP]   — dispatcher (switch runtime.GOOS)
-│   ├── os_limiter_windows.go        [NEW]    — Job Objects via x/sys/windows
-│   ├── os_limiter_linux.go          [NEW]    — cgroups v2/v1/posix fallback
-│   ├── tunnel.go                    [REWRITE] — real cloudflared + reconnect
-│   ├── tunnel_api.go                [NEW]    — permanent tunnel + CF API v4
-│   ├── vercel.go                    [REWRITE] — real HTTP calls + error types
-│   ├── keyring.go                   [NEW]    — dispatcher
-│   ├── keyring_windows.go           [NEW]    — DPAPI
-│   ├── keyring_linux.go             [NEW]    — D-Bus Secret Service
-│   ├── logpipe.go                   [NEW]    — 100ms batched log emitter
-│   ├── monitor.go                   [NEW]    — /proc or Windows API resource monitor
-│   ├── sysinfo.go                   [NEW]    — RAM + CPU (stdlib)
-│   ├── config.go                    [NEW]    — JSON config persistence
-│   ├── bundler.go                   [NEW]    — Bun portable auto-download
-│   └── validate.go                  [NEW]    — port, path, script validation
+│   ├── scanner/
+│   │   └── scanner.go               [KEEP]  — project scanner + cache
+│   ├── core/
+│   │   ├── sysinfo.go               [KEEP]  — RAM + CPU (stdlib)
+│   │   ├── sysinfo_windows.go       [KEEP]  — Windows GlobalMemoryStatusEx
+│   │   ├── sysinfo_linux.go         [KEEP]  — Linux stub
+│   │   ├── sysproc_windows.go       [KEEP]  — Windows SysProcAttr
+│   │   ├── sysproc_linux.go         [KEEP]  — Linux SysProcAttr (Setpgid)
+│   │   ├── validate.go              [KEEP]  — port, path, script validation
+│   │   └── config.go                [KEEP]  — JSON config persistence
+│   ├── process/
+│   │   ├── runner.go                [KEEP]  — dev server process launcher
+│   │   ├── os_limiter.go            [KEEP]  — dispatcher (switch runtime.GOOS)
+│   │   ├── os_limiter_windows.go    [KEEP]  — Job Objects via kernel32
+│   │   ├── os_limiter_linux.go      [KEEP]  — cgroups v2/v1/posix fallback
+│   │   ├── os_limiter_nonlinux.go   [KEEP]  — Linux stub for non-Linux builds
+│   │   ├── os_limiter_nonwindows.go [KEEP]  — Windows stub for non-Windows builds
+│   │   ├── processguard.go          [KEEP]  — anti-zombie PID tracker
+│   │   ├── bundler.go               [KEEP]  — Bun portable auto-download
+│   │   ├── logpipe.go               [KEEP]  — 100ms batched log emitter
+│   │   ├── monitor.go               [KEEP]  — /proc or WinAPI resource poller
+│   │   ├── monitor_windows.go       [KEEP]  — Windows GetProcessMemoryInfo
+│   │   ├── monitor_linux.go         [KEEP]  — Linux /proc/statm + /proc/stat
+│   │   ├── sysprocattr_linux.go     [KEEP]  — Linux Setpgid
+│   │   └── sysprocattr_default.go   [KEEP]  — non-Linux SysProcAttr stub
+│   ├── tunnel/
+│   │   ├── tunnel.go                [REFACTOR] — per-project tunnel instances (remove global state)
+│   │   └── tunnel_api.go            [KEEP]    — permanent tunnel + CF API v4
+│   ├── keyring/
+│   │   ├── keyring.go               [KEEP]  — dispatcher
+│   │   ├── keyring_windows.go       [KEEP]  — DPAPI
+│   │   └── keyring_linux.go         [KEEP]  — D-Bus Secret Service + AES fallback
+│   ├── vercel/
+│   │   └── vercel.go                [KEEP]  — real HTTP calls + error types
+│   └── projects/
+│       └── project.go               [NEW]   — Project struct, ProjectRegistry, lifecycle functions
 ├── frontend/src/
-│   ├── App.tsx                      [REWRITE] — state machine router
+│   ├── App.tsx                      [REWRITE] — dashboard-first state machine
 │   ├── screens/
-│   │   ├── DropZone.tsx             [NEW]    — drag-drop + file picker
-│   │   ├── ControlPanel.tsx         [NEW]    — sliders, selectors, config
-│   │   ├── Launching.tsx            [NEW]    — progress stepper
-│   │   └── Dashboard.tsx            [NEW]    — URL card, charts, logs
+│   │   ├── DropZone.tsx             [KEEP]    — drag-drop + file picker (embedded in modal)
+│   │   ├── ControlPanel.tsx         [KEEP]    — sliders, selectors, config (embedded in modal)
+│   │   ├── Dashboard.tsx            [REWRITE] — multi-project hub, landing page
+│   │   └── Launching.tsx            [KEEP]    — progress stepper (embedded in modal)
 │   ├── components/
-│   │   ├── LogTerminal.tsx          [NEW]    — virtualized ring-buffer log
-│   │   ├── ResourceChart.tsx        [NEW]    — Recharts area chart
-│   │   ├── OOMModal.tsx             [NEW]    — OOM warning dialog
-│   │   └── StatusDot.tsx            [NEW]    — connection status indicator
+│   │   ├── AddProjectModal.tsx      [NEW]    — embeds DropZone→ControlPanel→Launching
+│   │   ├── ProjectCard.tsx          [NEW]    — project status card with mini sparklines
+│   │   ├── LogTerminal.tsx          [UPDATE] — accept projectID for per-project log routing
+│   │   ├── ResourceChart.tsx        [UPDATE] — accept projectID for per-project routing
+│   │   ├── OOMModal.tsx             [KEEP]   — OOM warning dialog
+│   │   └── StatusDot.tsx            [KEEP]   — connection status indicator
 │   └── index.css                    [KEEP]
 ```
 
@@ -1189,10 +1155,20 @@ localcloud/
 | 22 | Log Terminal component | P7 | 9 | Virtualized 1000-line ring buffer |
 | 23 | Resource Chart component | P7 | 10 | Recharts area chart with threshold |
 | 24 | OOM Modal component | P7 | 7 | Warning dialog with restart option |
-| 25 | Dashboard screen | P7 | 22, 23, 24 | URL card + charts + logs + stop button |
-| 26 | App state machine | P7 | 19–25 | Full UX journey wired together |
+| 25 | Dashboard screen (single-project) | P7 | 22, 23, 24 | URL card + charts + logs + stop button |
+| 26 | App state machine (single-project) | P7 | 19–25 | Full UX journey wired together |
 | 27 | IPC hardening | P9 | — | WebView lockdown |
 | 28 | App bindings finalization | P10 | All | All Go functions exposed to frontend |
+| 29 | **Project Registry** | A4 | 1–28 | `Project` struct, `ProjectRegistry` singleton, lifecycle functions |
+| 30 | **Per-Project Tunnel Instances** | B4 | 29 | `TunnelInstance` per projectID, `TunnelManager` |
+| 31 | **Per-Project Resource Monitors** | B4 | 29 | Key monitors by projectID, events include projectID |
+| 32 | **Per-Project Log Streams** | B4 | 29 | Log channels keyed by projectID |
+| 33 | **Dashboard rewrite (multi-project hub)** | A4 | 29–32 | Landing page with project grid, cards, sparklines |
+| 34 | **ProjectCard component** | A4 | 33 | Status card with mini charts, stop/start/remove |
+| 35 | **AddProjectModal** | A4 | 33 | Modal embedding DropZone→ControlPanel→Launching |
+| 36 | **Project bindings (app_projects.go)** | A4 | 29, 33 | ListProjects, StartProject, StopProject, RemoveProject |
+| 37 | **App router rewrite (dashboard-first)** | A4 | 33–36 | Dashboard as landing, AddProjectModal |
+| 38 | **Project-aware telemetry bindings** | B4 | 30–32 | All bindings accept projectID |
 
 ---
 

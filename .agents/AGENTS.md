@@ -20,10 +20,11 @@ This repository contains **LocalCloud**, a minimalist self-hosting desktop engin
 
 * **Philosophy:** "Heavy Control Backend, High-End Visual Frontend, Frictionless UX (Zero Terminal Mindset)"
 * **User Flow:**
-  1. **Drop-Zone:** Target JavaScript/web projects. Validate `package.json`. If invalid, trigger a visual shake animation and show error: *"Berkas package.json tidak ditemukan..."*.
-  2. **Control Panel:** Auto-config port and dev script. GUI controls (sliders, selectors) for RAM/CPU cores limit allocation.
-  3. **GO LIVE:** Simple, prominent activation button that transitions into progress indicators.
-  4. **Dashboard:** Live URL card with copy button, charts for resource utilization (Recharts), and scrollable terminal log.
+  1. **Dashboard (Landing):** Multi-project management hub. Shows all managed projects in a card grid with status (running/stopped/error), port, tunnel URL, and live resource mini-charts. "Add New Project" button to onboard a new project. Click on a running project to expand its full detail panel.
+  2. **Add Project (Modal/Page):** Select project folder via drag-and-drop or browse. Validate `package.json`. If invalid, trigger a visual shake animation and show error: *"Berkas package.json tidak ditemukan..."*.
+  3. **Control Panel (Modal/Page):** Auto-config port and dev script. GUI controls (sliders, selectors) for RAM/CPU cores limit allocation. Vercel sync and Cloudflare tunnel configuration.
+  4. **GO LIVE:** Simple, prominent activation button that transitions into a launching progress stepper.
+  5. **Back to Dashboard:** After successful launch, the new project appears in the dashboard grid with its live tunnel URL, resource charts, and log terminal. User can launch more projects, stop individual ones, or remove them.
 
 ---
 
@@ -55,6 +56,17 @@ This repository contains **LocalCloud**, a minimalist self-hosting desktop engin
 - **Backend:** Throttling & Backpressure. Batch logs into a Go-channel buffer and dispatch to UI every 100ms in chunks.
 - **Frontend:** Maintain max 1000 logs in state using a ring-buffer (`logs.slice(-1000)`). Use virtualized lists (`react-window`) to only render visible lines and protect CPU/RAM.
 
+### 3.6 Multi-Project Manager (Go Engine)
+- **Project Registry:** In-memory map of managed projects keyed by `projectID` (UUID generated at scan time). Each entry stores `ScanResult`, `RunConfig`, `RunningProcess`, tunnel state, and resource monitor reference.
+- **Lifecycle Functions:**
+  - `RegisterProject(scan *ScanResult, cfg RunConfig) string` — generates projectID, stores in registry
+  - `StartProject(projectID string) error` — calls RunDevServer, starts tunnel, starts monitor
+  - `StopProject(projectID string) error` — kills process, stops tunnel, stops monitor
+  - `RemoveProject(projectID string)` — full cleanup and removal from registry
+  - `ListProjects() []ProjectState` — returns snapshot of all projects for dashboard
+  - `GetProject(projectID string) *ProjectState` — returns single project detail
+- **Thread Safety:** All registry operations protected by `sync.RWMutex`.
+
 ---
 
 ## 🔒 4. SECURITY & ROBUSTNESS CONSTRAINTS
@@ -65,6 +77,7 @@ This repository contains **LocalCloud**, a minimalist self-hosting desktop engin
   - *Linux:* Set `Setpgid: true` on `SysProcAttr`. On Wails shutdown (`OnShutdown`), kill the entire group: `syscall.Kill(-PGID, syscall.SIGKILL)`.
   - *Windows:* Processes assigned to the Job Object are automatically terminated when the parent process exits.
 - **Go-Routine Lifecycles:** Bind all routines to `context.WithCancel`. Call `cancel()` on stop to instantly release all resources.
+- **Project Isolation:** Each project's processes, tunnels, and monitors operate independently. Stopping one project must not affect others.
 
 ---
 
