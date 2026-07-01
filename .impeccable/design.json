@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-01T15:05:00+07:00",
+  "title": "Design System: LocalCloud",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Hypervisor Indigo",
+        "canonical": "#6366f1",
+        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#a5b4fc"]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Dark Void",
+        "canonical": "#0b0f17",
+        "tonalRamp": ["#02040a", "#05070f", "#0b0f17", "#121824", "#1c2536", "#29354d", "#3b4a6b", "#51638a"]
+      },
+      "neutral-card": {
+        "role": "neutral",
+        "displayName": "Card Slate",
+        "canonical": "#111827",
+        "tonalRamp": ["#030712", "#0b0f19", "#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af"]
+      },
+      "neutral-border": {
+        "role": "neutral",
+        "displayName": "Structural Border",
+        "canonical": "#1f2937",
+        "tonalRamp": ["#0b0f19", "#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db"]
+      },
+      "neutral-text": {
+        "role": "neutral",
+        "displayName": "Ink White",
+        "canonical": "#f3f4f6",
+        "tonalRamp": ["#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#e5e7eb", "#f3f4f6", "#f9fafb", "#ffffff"]
+      },
+      "accent-success": {
+        "role": "success",
+        "displayName": "Live Green",
+        "canonical": "#10b981",
+        "tonalRamp": ["#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7", "#a7f3d0"]
+      },
+      "accent-warning": {
+        "role": "warning",
+        "displayName": "Alert Amber",
+        "canonical": "#f59e0b",
+        "tonalRamp": ["#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fde68a"]
+      },
+      "accent-error": {
+        "role": "error",
+        "displayName": "Halt Red",
+        "canonical": "#ef4444",
+        "tonalRamp": ["#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Main page title and routing header" },
+      "headline": { "displayName": "Headline", "purpose": "Card headers and secondary division" },
+      "title": { "displayName": "Title", "purpose": "Sections and fields metadata" },
+      "body": { "displayName": "Body", "purpose": "Primary labels, descriptions and standard output" },
+      "label": { "displayName": "Label/Mono", "purpose": "Console logs, status text, and port fields" }
+    },
+    "shadows": [
+      { "name": "none", "value": "none", "purpose": "Enforced flat depth design system" }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "State changes and hover scaling" }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Standard call-to-action button for initiating processes.",
+      "html": "<button class=\"ds-btn-primary\">GO LIVE</button>",
+      "css": ".ds-btn-primary { background-color: #6366f1; color: #f3f4f6; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), transform 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background-color: #4f46e5; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Button used for halting dev servers or closing tunnels.",
+      "html": "<button class=\"ds-btn-danger\">STOP SERVER</button>",
+      "css": ".ds-btn-danger { background-color: #ef4444; color: #f3f4f6; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), transform 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-danger:hover { background-color: #dc2626; } .ds-btn-danger:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Container Card",
+      "kind": "card",
+      "refersTo": "card-container",
+      "description": "Structural layout container with 60% opacity background and border outline.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Project Details</h3><p class=\"ds-card-body\">This is a flat layered panel container.</p></div>",
+      "css": ".ds-card { background-color: rgba(17, 24, 39, 0.6); backdrop-filter: blur(12px); border: 1px solid #1f2937; border-radius: 12px; padding: 24px; color: #f3f4f6; font-family: 'Nunito', sans-serif; } .ds-card-title { font-size: 18px; font-weight: 600; margin-top: 0; margin-bottom: 8px; } .ds-card-body { font-size: 14px; color: #9ca3af; margin: 0; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Standard text input field for ports or paths.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"E.g., 3000\" />",
+      "css": ".ds-input { background-color: #111827; border: 1px solid #1f2937; border-radius: 6px; color: #f3f4f6; font-family: 'Nunito', sans-serif; font-size: 14px; padding: 8px 12px; outline: none; transition: border-color 150ms; } .ds-input:focus { border-color: #6366f1; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Minimalist Hypervisor",
+    "overview": "The Minimalist Hypervisor visual system is designed to convey absolute control, precision, and technical utility. Operating as a dark-first dashboard, it strips away decorative fluff (such as neon grid overlays or glowing text) to prioritize real-time telemetry, structured log outputs, and layout rhythm. The design operates with density rules, allocating maximum screen real estate to active processes, CPU/RAM monitoring, and clean log streams.",
+    "keyCharacteristics": [
+      "Dark void background (#0b0f17) with solid, flat card containers (#111827).",
+      "Flat depth hierarchy relying on tonal contrast instead of fuzzy box shadows.",
+      "Maximum corner rounding capped at 12px to prevent a soft 'AI-generated' look.",
+      "Strict typography scale using the Nunito font family for high legibility."
+    ],
+    "rules": [
+      {
+        "name": "The Rarity Rule",
+        "body": "Saturated primary accents (#6366f1) must cover less than 10% of any given screen area. Their sparse use represents high intent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tint Contrast Rule",
+        "body": "Body text on tinted cards must always remain at #f3f4f6 to guarantee a 4.5:1 contrast ratio against #111827.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Do not use shadow blurs (box-shadow) to lift elements. Depth is built using flat contrast boundaries (#111827 on top of #0b0f17 with a #1f2937 border).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do maintain a strict 4.5:1 text-to-background contrast ratio (Ink White text #f3f4f6 on Card Slate #111827).",
+      "Do enforce a maximum card corner radius of 12px.",
+      "Do use native, raw command arrays when spawning execution binaries to avoid command injection.",
+      "Do limit primary accent usage to less than 10% of total interface area."
+    ],
+    "donts": [
+      "Don't use border-left/right greater than 1px as a colored stripe on cards or alerts.",
+      "Don't use gradient text (e.g. background-clip: text with a gradient) for functional headers.",
+      "Don't combine a card border with a soft drop shadow (blur radius ≥ 16px) on the same element.",
+      "Don't use arbitrary z-index values; use the semantic scale (dropdown: 100, modal-backdrop: 200, modal: 300, toast: 400).",
+      "Don't let text overflow its containers on mobile/tablet viewports; clamp font sizes properly."
+    ]
+  }
+}
