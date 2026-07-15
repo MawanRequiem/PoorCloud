@@ -16,6 +16,12 @@ localcloud/frontend/.env*.local
 /vendor/
 localcloud/vendor/
 
+# Graphify / Code analysis cache
+graphify-out/
+
+# Command Code preferences (local only)
+.commandcode/
+
 # OS/Editor specific
 .DS_Store
 .idea/
