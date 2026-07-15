@@ -26,12 +26,28 @@ export function LimitResources(arg1, arg2, arg3) {
   return window['go']['main']['App']['LimitResources'](arg1, arg2, arg3);
 }
 
+export function ListProjects() {
+  return window['go']['main']['App']['ListProjects']();
+}
+
 export function LoadConfig() {
   return window['go']['main']['App']['LoadConfig']();
 }
 
+export function RegisterAndStartProject(arg1, arg2) {
+  return window['go']['main']['App']['RegisterAndStartProject'](arg1, arg2);
+}
+
+export function RemoveProject(arg1) {
+  return window['go']['main']['App']['RemoveProject'](arg1);
+}
+
 export function SaveConfig(arg1) {
   return window['go']['main']['App']['SaveConfig'](arg1);
+}
+
+export function SaveDefaultSettings(arg1) {
+  return window['go']['main']['App']['SaveDefaultSettings'](arg1);
 }
 
 export function ScanProject(arg1) {
@@ -44,6 +60,14 @@ export function StartEphemeralTunnel(arg1) {
 
 export function StartPermanentTunnel(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['StartPermanentTunnel'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function StartProject(arg1) {
+  return window['go']['main']['App']['StartProject'](arg1);
+}
+
+export function StopProject(arg1) {
+  return window['go']['main']['App']['StopProject'](arg1);
 }
 
 export function StopTunnel() {

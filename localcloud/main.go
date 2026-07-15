@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	wailsWindows "github.com/wailsapp/wails/v2/pkg/options/windows"
 	"localcloud/engine/process"
+	"localcloud/engine/projects"
 )
 
 //go:embed all:frontend/dist
@@ -30,6 +31,12 @@ func main() {
 		OnStartup: app.startup,
 		OnShutdown: func(ctx context.Context) {
 			process.CleanupZombies()
+			// Stop all running projects on shutdown
+			for _, p := range projects.ListProjects() {
+				if p.Status == "running" {
+					_ = projects.StopProject(p.ProjectID)
+				}
+			}
 		},
 		Bind: []interface{}{
 			app,

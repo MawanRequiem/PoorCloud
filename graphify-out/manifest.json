@@ -1,0 +1,332 @@
+{
+  ".impeccable/design.json": {
+    "mtime": 1783602573.9118211,
+    "ast_hash": "9cc3aafaefc6bb3c5b4c75bd150c0ab1",
+    "semantic_hash": "9cc3aafaefc6bb3c5b4c75bd150c0ab1"
+  },
+  "localcloud/app.go": {
+    "mtime": 1783602573.9124928,
+    "ast_hash": "45fbbf50d56f789c4b74f8df0c66e9d8",
+    "semantic_hash": "45fbbf50d56f789c4b74f8df0c66e9d8"
+  },
+  "localcloud/app_engine.go": {
+    "mtime": 1783602573.9124928,
+    "ast_hash": "29155033aefdf6d4a782d7787def6175",
+    "semantic_hash": "29155033aefdf6d4a782d7787def6175"
+  },
+  "localcloud/app_telemetry.go": {
+    "mtime": 1783602573.9124928,
+    "ast_hash": "329bafeac2d4d1ee3c68730d336cbff1",
+    "semantic_hash": "329bafeac2d4d1ee3c68730d336cbff1"
+  },
+  "localcloud/engine/core/config.go": {
+    "mtime": 1783602573.9139438,
+    "ast_hash": "08faec39bedbfdf1206651908bc6ee30",
+    "semantic_hash": "08faec39bedbfdf1206651908bc6ee30"
+  },
+  "localcloud/engine/core/sysinfo.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "be65a0d14d33d82196182a48cbe6b753",
+    "semantic_hash": "be65a0d14d33d82196182a48cbe6b753"
+  },
+  "localcloud/engine/core/sysinfo_linux.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "169fd40fd7b7d7ed24f72f6f0ac8a6d3",
+    "semantic_hash": "169fd40fd7b7d7ed24f72f6f0ac8a6d3"
+  },
+  "localcloud/engine/core/sysinfo_windows.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "7f1c02248dc9298dfb3a21d92a41ae5e",
+    "semantic_hash": "7f1c02248dc9298dfb3a21d92a41ae5e"
+  },
+  "localcloud/engine/core/sysproc_linux.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "c8540a81d2946871d6960db4309e4a4b",
+    "semantic_hash": "c8540a81d2946871d6960db4309e4a4b"
+  },
+  "localcloud/engine/core/sysproc_windows.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "942e6858f7fc142bb24be317810b571b",
+    "semantic_hash": "942e6858f7fc142bb24be317810b571b"
+  },
+  "localcloud/engine/core/validate.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "ed36b126bbc21bc601916ab016c3c826",
+    "semantic_hash": "ed36b126bbc21bc601916ab016c3c826"
+  },
+  "localcloud/engine/keyring/keyring.go": {
+    "mtime": 1783602573.9140115,
+    "ast_hash": "7b4a50ea587bd6590873f2a120fcbf5b",
+    "semantic_hash": "7b4a50ea587bd6590873f2a120fcbf5b"
+  },
+  "localcloud/engine/keyring/keyring_linux.go": {
+    "mtime": 1783602573.914242,
+    "ast_hash": "f988d1d690148375c0aaa299bb1f5413",
+    "semantic_hash": "f988d1d690148375c0aaa299bb1f5413"
+  },
+  "localcloud/engine/keyring/keyring_windows.go": {
+    "mtime": 1783602573.914242,
+    "ast_hash": "60ea68c877d5b3cb60c61d5cc76b0942",
+    "semantic_hash": "60ea68c877d5b3cb60c61d5cc76b0942"
+  },
+  "localcloud/engine/process/bundler.go": {
+    "mtime": 1783602573.914242,
+    "ast_hash": "826f42fd6b1e14376135631d936e6064",
+    "semantic_hash": "826f42fd6b1e14376135631d936e6064"
+  },
+  "localcloud/engine/process/logpipe.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "3cd7c137e9b8eab50d0986283e842a17",
+    "semantic_hash": "3cd7c137e9b8eab50d0986283e842a17"
+  },
+  "localcloud/engine/process/monitor.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "260588e65acbe54324b5ad5695849840",
+    "semantic_hash": "260588e65acbe54324b5ad5695849840"
+  },
+  "localcloud/engine/process/monitor_linux.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "20e6f3e112013c78ff3eb253d3ac0555",
+    "semantic_hash": "20e6f3e112013c78ff3eb253d3ac0555"
+  },
+  "localcloud/engine/process/monitor_windows.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "f8413d744e9191838130a02b086abd8c",
+    "semantic_hash": "f8413d744e9191838130a02b086abd8c"
+  },
+  "localcloud/engine/process/os_limiter.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "64dc2847b25e092364c6fc58b6c5b4a2",
+    "semantic_hash": "64dc2847b25e092364c6fc58b6c5b4a2"
+  },
+  "localcloud/engine/process/os_limiter_linux.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "4576eca8e1d5c6b7af04f9c8b15f7a48",
+    "semantic_hash": "4576eca8e1d5c6b7af04f9c8b15f7a48"
+  },
+  "localcloud/engine/process/os_limiter_nonlinux.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "f055888d2bc6498441f3fcfb6b8c9b49",
+    "semantic_hash": "f055888d2bc6498441f3fcfb6b8c9b49"
+  },
+  "localcloud/engine/process/os_limiter_nonwindows.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "b3ef590787e133774a88a66b57c8713f",
+    "semantic_hash": "b3ef590787e133774a88a66b57c8713f"
+  },
+  "localcloud/engine/process/os_limiter_windows.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "42684118bf0e8877297c9606e7693292",
+    "semantic_hash": "42684118bf0e8877297c9606e7693292"
+  },
+  "localcloud/engine/process/processguard.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "c5994bf140e1edb6e6a69c4575dfaf66",
+    "semantic_hash": "c5994bf140e1edb6e6a69c4575dfaf66"
+  },
+  "localcloud/engine/process/runner.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "2a11eacc16e5bbb8f9b83fe8c774e463",
+    "semantic_hash": "2a11eacc16e5bbb8f9b83fe8c774e463"
+  },
+  "localcloud/engine/process/sysprocattr_default.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "3b7cbdb8b5e3f0ee56b6bd809f895c0b",
+    "semantic_hash": "3b7cbdb8b5e3f0ee56b6bd809f895c0b"
+  },
+  "localcloud/engine/process/sysprocattr_linux.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "12d40f412d6d8a46ba691a061cc27623",
+    "semantic_hash": "12d40f412d6d8a46ba691a061cc27623"
+  },
+  "localcloud/engine/scanner/scanner.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "df8a14c228876ec352552b049beff5f7",
+    "semantic_hash": "df8a14c228876ec352552b049beff5f7"
+  },
+  "localcloud/engine/tunnel/tunnel.go": {
+    "mtime": 1783602573.9143946,
+    "ast_hash": "ea4d13ec8e8ed9ed92e868f754d015d4",
+    "semantic_hash": "ea4d13ec8e8ed9ed92e868f754d015d4"
+  },
+  "localcloud/engine/tunnel/tunnel_api.go": {
+    "mtime": 1783602573.915005,
+    "ast_hash": "811458e0c40e3e35f28afc6667d2a60d",
+    "semantic_hash": "811458e0c40e3e35f28afc6667d2a60d"
+  },
+  "localcloud/engine/vercel/vercel.go": {
+    "mtime": 1783602573.915005,
+    "ast_hash": "a825a1cbe43ea34a8ea36f5eb1298cd7",
+    "semantic_hash": "a825a1cbe43ea34a8ea36f5eb1298cd7"
+  },
+  "localcloud/frontend/package.json": {
+    "mtime": 1783602573.915215,
+    "ast_hash": "becded26f396a9ed81427001b4927500",
+    "semantic_hash": "becded26f396a9ed81427001b4927500"
+  },
+  "localcloud/frontend/src/App.tsx": {
+    "mtime": 1783602573.915215,
+    "ast_hash": "9fa8a3672f2b1cec4995016b10d4d741",
+    "semantic_hash": "9fa8a3672f2b1cec4995016b10d4d741"
+  },
+  "localcloud/frontend/src/components/LogTerminal.tsx": {
+    "mtime": 1783602573.915698,
+    "ast_hash": "885b17963bed8adfef849e1c61e15c49",
+    "semantic_hash": "885b17963bed8adfef849e1c61e15c49"
+  },
+  "localcloud/frontend/src/components/OOMModal.tsx": {
+    "mtime": 1783602573.9164455,
+    "ast_hash": "f2d4fd71e70e1e2a34ebb936685765e0",
+    "semantic_hash": "f2d4fd71e70e1e2a34ebb936685765e0"
+  },
+  "localcloud/frontend/src/components/ResourceChart.tsx": {
+    "mtime": 1783602573.9164455,
+    "ast_hash": "120959c236c2d6581c6bbbd182ed8006",
+    "semantic_hash": "120959c236c2d6581c6bbbd182ed8006"
+  },
+  "localcloud/frontend/src/components/StatusDot.tsx": {
+    "mtime": 1783602573.9164455,
+    "ast_hash": "ded1f464abcbbd612eeb215a326fbf3b",
+    "semantic_hash": "ded1f464abcbbd612eeb215a326fbf3b"
+  },
+  "localcloud/frontend/src/main.tsx": {
+    "mtime": 1783602573.9164455,
+    "ast_hash": "21974b05164719cdb24767e0132ecd66",
+    "semantic_hash": "21974b05164719cdb24767e0132ecd66"
+  },
+  "localcloud/frontend/src/screens/ControlPanel.tsx": {
+    "mtime": 1783602573.9164455,
+    "ast_hash": "e3f0e8a0fafba83de3eb782986625d4d",
+    "semantic_hash": "e3f0e8a0fafba83de3eb782986625d4d"
+  },
+  "localcloud/frontend/src/screens/Dashboard.tsx": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "465c5a2bd2c60bd5101fcd88b9746e72",
+    "semantic_hash": "465c5a2bd2c60bd5101fcd88b9746e72"
+  },
+  "localcloud/frontend/src/screens/DropZone.tsx": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "a812b448efbe1dd49c477d85f8401b1f",
+    "semantic_hash": "a812b448efbe1dd49c477d85f8401b1f"
+  },
+  "localcloud/frontend/src/screens/Launching.tsx": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "22888e81047d8832844c1393662c086c",
+    "semantic_hash": "22888e81047d8832844c1393662c086c"
+  },
+  "localcloud/frontend/src/vite-env.d.ts": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "0352474ba2918efe13895edbc3780d94",
+    "semantic_hash": "0352474ba2918efe13895edbc3780d94"
+  },
+  "localcloud/frontend/tsconfig.json": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "a7c2d7d362b93a0ced1ef00959481f34",
+    "semantic_hash": "a7c2d7d362b93a0ced1ef00959481f34"
+  },
+  "localcloud/frontend/tsconfig.node.json": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "80e0f622dc62c135bc19cda859de41b9",
+    "semantic_hash": "80e0f622dc62c135bc19cda859de41b9"
+  },
+  "localcloud/frontend/vite.config.ts": {
+    "mtime": 1783602573.9167202,
+    "ast_hash": "17451e67b42764a90566a7e2161bc10b",
+    "semantic_hash": "17451e67b42764a90566a7e2161bc10b"
+  },
+  "localcloud/frontend/wailsjs/go/main/App.d.ts": {
+    "mtime": 1783602573.9170282,
+    "ast_hash": "87d49efcba601aeb1eefa8939dea0cc3",
+    "semantic_hash": "87d49efcba601aeb1eefa8939dea0cc3"
+  },
+  "localcloud/frontend/wailsjs/go/main/App.js": {
+    "mtime": 1783602573.917216,
+    "ast_hash": "0fd1e05baed535497c35579881dbf9b8",
+    "semantic_hash": "0fd1e05baed535497c35579881dbf9b8"
+  },
+  "localcloud/frontend/wailsjs/go/models.ts": {
+    "mtime": 1783602573.917216,
+    "ast_hash": "738568d3dfe4e4b0d9652a0398f80431",
+    "semantic_hash": "738568d3dfe4e4b0d9652a0398f80431"
+  },
+  "localcloud/frontend/wailsjs/runtime/package.json": {
+    "mtime": 1783602573.917216,
+    "ast_hash": "a79e9c39ebcda0fdeb14a44939bc489e",
+    "semantic_hash": "a79e9c39ebcda0fdeb14a44939bc489e"
+  },
+  "localcloud/frontend/wailsjs/runtime/runtime.d.ts": {
+    "mtime": 1783602573.9173875,
+    "ast_hash": "dcd9fca4af1912f552547c22f315c25e",
+    "semantic_hash": "dcd9fca4af1912f552547c22f315c25e"
+  },
+  "localcloud/frontend/wailsjs/runtime/runtime.js": {
+    "mtime": 1783602573.9173875,
+    "ast_hash": "efc7f0ddc7f96e446ad0252df27b477f",
+    "semantic_hash": "efc7f0ddc7f96e446ad0252df27b477f"
+  },
+  "localcloud/go.mod": {
+    "mtime": 1783602573.9173875,
+    "ast_hash": "bee1461f2f6162da30fb9c639a1b3d1b",
+    "semantic_hash": "bee1461f2f6162da30fb9c639a1b3d1b"
+  },
+  "localcloud/main.go": {
+    "mtime": 1783602573.9173875,
+    "ast_hash": "59b6a348b81dfe839bbffa4008d901b3",
+    "semantic_hash": "59b6a348b81dfe839bbffa4008d901b3"
+  },
+  "localcloud/wails.json": {
+    "mtime": 1783602573.9173875,
+    "ast_hash": "40e9ee687b4c6480a23ae700a6cb3ec2",
+    "semantic_hash": "40e9ee687b4c6480a23ae700a6cb3ec2"
+  },
+  ".agents/AGENTS.md": {
+    "mtime": 1783602573.9112208,
+    "ast_hash": "12656e26660aa86faa7d438ac775c319",
+    "semantic_hash": "12656e26660aa86faa7d438ac775c319"
+  },
+  ".agents/HANDOVER.md": {
+    "mtime": 1783602573.9118211,
+    "ast_hash": "09f7b1ead04ff5c22f4f238af6f1c26c",
+    "semantic_hash": "09f7b1ead04ff5c22f4f238af6f1c26c"
+  },
+  ".agents/IMPLEMENTATION_PLAN.md": {
+    "mtime": 1783602573.9118211,
+    "ast_hash": "d7d05f1c113761488cc298e24456c93b",
+    "semantic_hash": "d7d05f1c113761488cc298e24456c93b"
+  },
+  ".agents/TASKS.md": {
+    "mtime": 1783602573.9118211,
+    "ast_hash": "251df2fe53279ee82e066e752bde6ea2",
+    "semantic_hash": "251df2fe53279ee82e066e752bde6ea2"
+  },
+  "DESIGN.md": {
+    "mtime": 1783602573.9118211,
+    "ast_hash": "aa8104fddef167dd0b04d0a3aebe2ba0",
+    "semantic_hash": "aa8104fddef167dd0b04d0a3aebe2ba0"
+  },
+  "PRODUCT.md": {
+    "mtime": 1783602573.9118211,
+    "ast_hash": "793dbdec9178bd2596a353ccb8dfb042",
+    "semantic_hash": "793dbdec9178bd2596a353ccb8dfb042"
+  },
+  "localcloud/README.md": {
+    "mtime": 1783602573.9124928,
+    "ast_hash": "1221121e965ff090f4036aebd603860d",
+    "semantic_hash": "1221121e965ff090f4036aebd603860d"
+  },
+  "localcloud/frontend/index.html": {
+    "mtime": 1783602573.915005,
+    "ast_hash": "e64beae766bf3b8c883294b65c47abd6",
+    "semantic_hash": "e64beae766bf3b8c883294b65c47abd6"
+  },
+  "localcloud/frontend/src/assets/fonts/OFL.txt": {
+    "mtime": 1783602573.9156165,
+    "ast_hash": "4e3d9becbf87c0341298fadf87ae4d36",
+    "semantic_hash": "4e3d9becbf87c0341298fadf87ae4d36"
+  },
+  "localcloud/frontend/src/assets/images/logo-universal.png": {
+    "mtime": 1783602573.915698,
+    "ast_hash": "f7ae2c8bdd62b57052a7ce127fcb3a01",
+    "semantic_hash": "f7ae2c8bdd62b57052a7ce127fcb3a01"
+  }
+}

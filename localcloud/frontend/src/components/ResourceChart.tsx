@@ -17,22 +17,25 @@ interface DataPoint {
 
 interface ResourceChartProps {
   type: "ram" | "cpu";
-  limit: number; // RAM in MB or CPU in Cores (or percent)
+  limit: number;
+  projectID?: string;
 }
 
 interface ResourceEvent {
+  projectID: string;
   ramMB: number;
   ramPercent: number;
   cpuPercent: number;
   timestamp: number;
 }
 
-export const ResourceChart: React.FC<ResourceChartProps> = ({ type, limit }) => {
+export const ResourceChart: React.FC<ResourceChartProps> = ({ type, limit, projectID }) => {
   const [data, setData] = useState<DataPoint[]>([]);
 
   useEffect(() => {
-    // Listen to Go telemetry monitor ticks (every 1s)
     const unsubscribe = EventsOn("resource-usage", (usage: ResourceEvent) => {
+      if (projectID && usage.projectID !== projectID) return;
+
       setData((prev) => {
         const dateObj = new Date(usage.timestamp);
         const timeStr = dateObj.toLocaleTimeString([], {
@@ -47,25 +50,21 @@ export const ResourceChart: React.FC<ResourceChartProps> = ({ type, limit }) => 
           value: type === "ram" ? usage.ramMB : usage.cpuPercent,
         };
 
-        return [...prev, point].slice(-60); // 60 second circular buffer
+        return [...prev, point].slice(-60);
       });
     });
 
-    return () => {
-      unsubscribe();
-    };
-  }, [type]);
+    return () => unsubscribe();
+  }, [type, projectID]);
 
   const isRAM = type === "ram";
-  const strokeColor = isRAM ? "#6366f1" : "#10b981"; // Indigo for RAM, Emerald for CPU
-  const gradientId = `gradient-${type}`;
-  const valueLabel = isRAM ? "RAM Usage (MB)" : "CPU Load (%)";
+  const strokeColor = isRAM ? "#6366f1" : "#10b981";
+  const gradientId = `gradient-${type}-${projectID || "global"}`;
   const limitLabel = isRAM ? `Limit: ${limit}MB` : `Limit: ${limit}%`;
 
   return (
     <div
       className="flex-1 min-w-[280px] bg-gray-950/60 border border-gray-900 rounded-xl p-4 flex flex-col shadow-lg backdrop-blur-md"
-      id={`resource-chart-${type}`}
     >
       <div className="flex justify-between items-baseline mb-2">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-mono">
@@ -116,7 +115,6 @@ export const ResourceChart: React.FC<ResourceChartProps> = ({ type, limit }) => 
             <Area
               type="monotone"
               dataKey="value"
-              name={valueLabel}
               stroke={strokeColor}
               strokeWidth={2}
               fill={`url(#${gradientId})`}

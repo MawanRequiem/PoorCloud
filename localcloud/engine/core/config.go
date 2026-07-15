@@ -26,6 +26,7 @@ type WindowBounds struct {
 type AppConfig struct {
 	LastProjectPath string         `json:"lastProjectPath"`
 	LastRunConfig   *RunConfigSave `json:"lastRunConfig,omitempty"`
+	DefaultRunConfig *RunConfigSave `json:"defaultRunConfig,omitempty"`
 	WindowBounds    *WindowBounds  `json:"windowBounds,omitempty"`
 }
 

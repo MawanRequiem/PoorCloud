@@ -15,10 +15,7 @@ const parseLogLine = (line: string): LogEntry => {
     second: "2-digit",
     hour12: false,
   });
-  return {
-    raw: line,
-    timestamp: timeStr,
-  };
+  return { raw: line, timestamp: timeStr };
 };
 
 const LogLine: React.FC<{ style: React.CSSProperties; entry: LogEntry }> = ({
@@ -28,15 +25,9 @@ const LogLine: React.FC<{ style: React.CSSProperties; entry: LogEntry }> = ({
   if (!entry) return null;
 
   const getLineColor = (text: string) => {
-    if (/\b(200|201|304)\b/.test(text)) {
-      return "text-emerald-400 font-medium";
-    }
-    if (/\b(404|500|503)\b/i.test(text) || /error|failed|exception/i.test(text)) {
-      return "text-rose-500 font-bold";
-    }
-    if (/warn|warning/i.test(text)) {
-      return "text-amber-400 font-medium";
-    }
+    if (/\b(200|201|304)\b/.test(text)) return "text-emerald-400 font-medium";
+    if (/\b(404|500|503)\b/i.test(text) || /error|failed|exception/i.test(text)) return "text-rose-500 font-bold";
+    if (/warn|warning/i.test(text)) return "text-amber-400 font-medium";
     return "text-gray-300";
   };
 
@@ -51,19 +42,22 @@ const LogLine: React.FC<{ style: React.CSSProperties; entry: LogEntry }> = ({
   );
 };
 
-export const LogTerminal: React.FC = () => {
+interface LogTerminalProps {
+  projectID?: string;
+}
+
+export const LogTerminal: React.FC<LogTerminalProps> = ({ projectID }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const listRef = useRef<FixedSizeList>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(250);
 
-  // Read actual height of the parent container to keep it responsive
   useEffect(() => {
     if (containerRef.current) {
       const resizeObserver = new ResizeObserver((entries) => {
         for (let entry of entries) {
-          setHeight(Math.max(150, entry.contentRect.height - 40)); // leave space for header
+          setHeight(Math.max(150, entry.contentRect.height - 40));
         }
       });
       resizeObserver.observe(containerRef.current);
@@ -72,18 +66,16 @@ export const LogTerminal: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Listen to "process-log" batches from Go backpressure channel
-    const unsubscribe = EventsOn("process-log", (batch: string[]) => {
+    const unsubscribe = EventsOn("process-log", (data: { projectID: string; lines: string[] }) => {
+      if (projectID && data.projectID !== projectID) return;
       setLogs((prev) => {
-        const newLogs = [...prev, ...batch.map((line) => parseLogLine(line))];
-        return newLogs.slice(-1000); // 1000-line ring buffer limit
+        const newLogs = [...prev, ...(data.lines || []).map((line) => parseLogLine(line))];
+        return newLogs.slice(-1000);
       });
     });
 
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+    return () => unsubscribe();
+  }, [projectID]);
 
   useEffect(() => {
     if (autoScroll && listRef.current && logs.length > 0) {
@@ -91,15 +83,12 @@ export const LogTerminal: React.FC = () => {
     }
   }, [logs, autoScroll]);
 
-  const handleClear = () => {
-    setLogs([]);
-  };
+  const handleClear = () => setLogs([]);
 
   return (
     <div
       ref={containerRef}
       className="flex-1 w-full flex flex-col bg-gray-950/80 border border-gray-900 rounded-xl overflow-hidden shadow-inner"
-      id="log-terminal-widget"
     >
       <div className="flex justify-between items-center px-4 py-2 border-b border-gray-900 bg-gray-950/90 select-none">
         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">
@@ -139,7 +128,6 @@ export const LogTerminal: React.FC = () => {
             itemSize={24}
             onScroll={({ scrollOffset, scrollUpdateWasRequested }) => {
               if (!scrollUpdateWasRequested) {
-                // Determine if at bottom (logs height - window height)
                 const totalHeight = logs.length * 24;
                 const isAtBottom = scrollOffset >= totalHeight - height - 48;
                 setAutoScroll(isAtBottom);

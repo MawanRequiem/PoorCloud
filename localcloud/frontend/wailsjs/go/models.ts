@@ -45,6 +45,7 @@ export namespace core {
 	export class AppConfig {
 	    lastProjectPath: string;
 	    lastRunConfig?: RunConfigSave;
+	    defaultRunConfig?: RunConfigSave;
 	    windowBounds?: WindowBounds;
 	
 	    static createFrom(source: any = {}) {
@@ -55,6 +56,7 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.lastProjectPath = source["lastProjectPath"];
 	        this.lastRunConfig = this.convertValues(source["lastRunConfig"], RunConfigSave);
+	        this.defaultRunConfig = this.convertValues(source["defaultRunConfig"], RunConfigSave);
 	        this.windowBounds = this.convertValues(source["windowBounds"], WindowBounds);
 	    }
 	
@@ -93,6 +95,76 @@ export namespace core {
 	        this.cpuCores = source["cpuCores"];
 	        this.os = source["os"];
 	        this.arch = source["arch"];
+	    }
+	}
+
+}
+
+export namespace process {
+	
+	export class RunConfig {
+	    projectPath: string;
+	    runtime: string;
+	    scriptName: string;
+	    port: number;
+	    memoryMB: number;
+	    cpuCores: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectPath = source["projectPath"];
+	        this.runtime = source["runtime"];
+	        this.scriptName = source["scriptName"];
+	        this.port = source["port"];
+	        this.memoryMB = source["memoryMB"];
+	        this.cpuCores = source["cpuCores"];
+	    }
+	}
+
+}
+
+export namespace projects {
+	
+	export class ProjectState {
+	    projectID: string;
+	    name: string;
+	    version: string;
+	    framework: string;
+	    port: number;
+	    tunnelURL: string;
+	    tunnelStatus: string;
+	    status: string;
+	    ramMB: number;
+	    cpuPercent: number;
+	    projectPath: string;
+	    devCommand: string;
+	    hasNode: boolean;
+	    hasBun: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectID = source["projectID"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.framework = source["framework"];
+	        this.port = source["port"];
+	        this.tunnelURL = source["tunnelURL"];
+	        this.tunnelStatus = source["tunnelStatus"];
+	        this.status = source["status"];
+	        this.ramMB = source["ramMB"];
+	        this.cpuPercent = source["cpuPercent"];
+	        this.projectPath = source["projectPath"];
+	        this.devCommand = source["devCommand"];
+	        this.hasNode = source["hasNode"];
+	        this.hasBun = source["hasBun"];
 	    }
 	}
 

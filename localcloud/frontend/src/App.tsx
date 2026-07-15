@@ -1,206 +1,152 @@
 import { useState, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { XCircle } from "lucide-react";
-import { DropZone } from "./screens/DropZone";
-import { ControlPanel } from "./screens/ControlPanel";
+import { AnimatePresence } from "framer-motion";
+import { Sidebar } from "./components/Sidebar";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { AddProjectModal } from "./components/AddProjectModal";
 import { Dashboard } from "./screens/Dashboard";
-import { Launching } from "./screens/Launching";
 import { OOMModal } from "./components/OOMModal";
-import type { RunConfig } from "./screens/ControlPanel";
+import type { ProjectState, ScanResult, RunConfig } from "./types";
 import {
-  StartEphemeralTunnel,
-  StartPermanentTunnel,
-  StopTunnel,
-  SyncVercel,
-  SaveConfig,
+  ListProjects,
+  StartProject,
+  StopProject,
+  RemoveProject,
+  RegisterAndStartProject,
+  ScanProject,
 } from "../wailsjs/go/main/App";
 import { EventsOn } from "../wailsjs/runtime/runtime";
 
-interface ScanResult {
-  name: string;
-  version: string;
-  scripts: Record<string, string>;
-  devCommand: string;
-  defaultPort: number;
-  framework: string;
-  hasNode: boolean;
-  hasBun: boolean;
-  projectPath: string;
-}
-
-type AppScreen = "dropzone" | "control" | "launching" | "dashboard";
-
 function App() {
-  const [screen, setScreen] = useState<AppScreen>("dropzone");
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [runConfig, setRunConfig] = useState<RunConfig | null>(null);
-  const [tunnelURL, setTunnelURL] = useState("");
-
-  // Launching state
-  const [launchStep, setLaunchStep] = useState(1);
-  const [launchError, setLaunchError] = useState("");
-  const [launchSteps] = useState([
-    { id: 1, label: "Memulai server lokal..." },
-    { id: 2, label: "Menerapkan batasan resource..." },
-    { id: 3, label: "Membuka terowongan aman..." },
-    { id: 4, label: "Menyelaraskan Vercel..." },
-  ]);
+  const [projects, setProjects] = useState<ProjectState[]>([]);
+  const [selectedProjectID, setSelectedProjectID] = useState<string | null>(null);
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // OOM state
   const [oomOpen, setOomOpen] = useState(false);
   const [oomMemoryLimit, setOomMemoryLimit] = useState(0);
 
-  // Listen for tunnel status during launching
   useEffect(() => {
-    if (screen !== "launching") return;
-
-    const unsub = EventsOn("tunnel-status", (data: { status: string; url: string; error?: string }) => {
-      if (data.status === "CONNECTED") {
-        setTunnelURL(data.url);
-        setLaunchStep(4);
-
-        if (runConfig?.vercelSync) {
-          SyncVercel(
-            runConfig.vercelToken,
-            runConfig.vercelProject,
-            runConfig.vercelTeam,
-            runConfig.vercelEnvKey,
-            data.url
-          )
-            .then(() => {
-              setTimeout(() => setScreen("dashboard"), 300);
-            })
-            .catch((err) => {
-              setLaunchError(`Vercel sync gagal: ${err}`);
-            });
-        } else {
-          setTimeout(() => setScreen("dashboard"), 300);
-        }
-      } else if (data.status === "FAILED") {
-        setLaunchError(data.error || "Gagal membuat terowongan");
-      }
-    });
-
-    return () => unsub();
-  }, [screen, runConfig]);
-
-  // Listen for OOM events
-  useEffect(() => {
-    const unsub = EventsOn("process-oom", (data: { memoryLimit: number }) => {
-      setOomMemoryLimit(data.memoryLimit || 0);
-      setOomOpen(true);
-    });
-    return () => unsub();
+    refreshProjects();
   }, []);
 
-  const handleScanned = (result: ScanResult) => {
-    setScanResult(result);
-    setScreen("control");
-  };
+  useEffect(() => {
+    const unsub = EventsOn("tunnel-status", () => {
+      refreshProjects();
+    });
 
-  const handleGoLive = async (config: RunConfig) => {
-    setRunConfig(config);
-    setLaunchError("");
-    setLaunchStep(1);
-    setScreen("launching");
+    const unsubOOM = EventsOn("process-oom", (data: { memoryLimit: number }) => {
+      setOomMemoryLimit(data.memoryLimit || 0);
+      setOomOpen(true);
+      refreshProjects();
+    });
 
-    // Save config
+    return () => {
+      unsub();
+      unsubOOM();
+    };
+  }, []);
+
+  const refreshProjects = async () => {
     try {
-      await SaveConfig({
-        lastProjectPath: config.projectPath,
-        lastRunConfig: {
-          scriptName: config.scriptName,
-          port: config.port,
-          memoryMB: config.memoryMB,
-          cpuCores: config.cpuCores,
-          vercelSync: config.vercelSync,
-          vercelEnvKey: config.vercelEnvKey,
-          tunnelMode: config.tunnelMode,
-        },
-      } as any);
+      const list = await ListProjects();
+      setProjects(list || []);
     } catch {
-      // Non-blocking
+      // Wails bindings may not be regenerated yet during dev
     }
+  };
 
-    // Step 1-2: Local server & resource limits (handled by engine runner)
-    setLaunchStep(2);
-    await new Promise((r) => setTimeout(r, 400));
+  const handleAddProject = () => {
+    setSelectedProjectID(null);
+    setAddProjectOpen(true);
+  };
 
-    // Step 3: Start tunnel
-    setLaunchStep(3);
+  const handleAddProjectComplete = async (scan: ScanResult, config: RunConfig) => {
     try {
-      if (config.tunnelMode === "permanent") {
-        await StartPermanentTunnel(
-          config.port,
-          config.cfDomain,
-          config.cfAccount,
-          config.cfToken,
-          config.cfTunnelName
-        );
-      } else {
-        await StartEphemeralTunnel(config.port);
-      }
+      await RegisterAndStartProject(scan as any, config);
+      await refreshProjects();
     } catch (err) {
-      setLaunchError(String(err));
+      console.error("Failed to register project:", err);
+    }
+    setAddProjectOpen(false);
+  };
+
+  const handleStart = async (projectID: string) => {
+    try {
+      await StartProject(projectID);
+      await refreshProjects();
+    } catch (err) {
+      console.error("Failed to start project:", err);
     }
   };
 
-  const handleStop = () => {
-    StopTunnel();
-    setScreen("dropzone");
+  const handleStop = async (projectID: string) => {
+    try {
+      await StopProject(projectID);
+      await refreshProjects();
+    } catch (err) {
+      console.error("Failed to stop project:", err);
+    }
   };
 
-  const handleOomRestart = () => {
-    setOomOpen(false);
-    handleStop();
+  const handleRemove = async (projectID: string) => {
+    try {
+      await RemoveProject(projectID);
+      if (selectedProjectID === projectID) {
+        setSelectedProjectID(null);
+      }
+      await refreshProjects();
+    } catch (err) {
+      console.error("Failed to remove project:", err);
+    }
   };
 
-  const handleOomChangeSettings = () => {
-    setOomOpen(false);
-    setScreen("control");
+  const handleSelectProject = (projectID: string) => {
+    setSelectedProjectID(selectedProjectID === projectID ? null : projectID);
   };
-
-  // ─── Launching Screen ───────────────────────────────────────
-  if (screen === "launching" && runConfig) {
-    return (
-      <Launching
-        launchStep={launchStep}
-        launchError={launchError}
-        runConfig={runConfig as any}
-        onCancel={() => {
-          StopTunnel();
-          setScreen("control");
-        }}
-      />
-    );
-  }
 
   return (
     <>
-      <AnimatePresence mode="wait">
-        {screen === "dropzone" && (
-          <DropZone key="dropzone" onScanned={handleScanned} />
-        )}
+      <Sidebar
+        projects={projects}
+        selectedProjectID={selectedProjectID}
+        onSelectProject={handleSelectProject}
+        onAddProject={handleAddProject}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
-        {screen === "control" && scanResult && (
-          <ControlPanel key="control" scan={scanResult} onGoLive={handleGoLive} />
-        )}
+      <Dashboard
+        projects={projects}
+        selectedProjectID={selectedProjectID}
+        onSelectProject={handleSelectProject}
+        onStart={handleStart}
+        onStop={handleStop}
+        onRemove={handleRemove}
+        onAddProject={handleAddProject}
+      />
 
-        {screen === "dashboard" && (
-          <Dashboard
-            key="dashboard"
-            tunnelURL={tunnelURL}
-            runConfig={runConfig!}
-            onStop={handleStop}
-          />
-        )}
-      </AnimatePresence>
+      <AddProjectModal
+        open={addProjectOpen}
+        onComplete={handleAddProjectComplete}
+        onClose={() => setAddProjectOpen(false)}
+      />
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       <OOMModal
         open={oomOpen}
         memoryLimit={oomMemoryLimit}
-        onRestart={handleOomRestart}
-        onChangeSettings={handleOomChangeSettings}
+        onRestart={() => {
+          setOomOpen(false);
+          if (selectedProjectID) handleStart(selectedProjectID);
+        }}
+        onChangeSettings={() => {
+          setOomOpen(false);
+          setSettingsOpen(true);
+        }}
       />
     </>
   );

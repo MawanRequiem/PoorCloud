@@ -16,22 +16,27 @@ import (
 	"localcloud/engine/core"
 )
 
-var (
-	tunnelMu     sync.Mutex
-	tunnelStatus = "DISCONNECTED"
-	publicURL    = ""
-	cancelFunc   context.CancelFunc
-	tunnelCmd    *exec.Cmd
-)
+type TunnelInstance struct {
+	ProjectID string
+	Status    string
+	URL       string
+	Ctx       context.Context
+	Cancel    context.CancelFunc
+	Cmd       *exec.Cmd
+	mu        sync.Mutex
+}
 
-// findCloudflared locates the cloudflared executable.
+type TunnelManager struct {
+	instances sync.Map
+}
+
+var manager = &TunnelManager{}
+
 func findCloudflared() (string, error) {
-	// 1. Look in system PATH
 	if path, err := exec.LookPath("cloudflared"); err == nil {
 		return path, nil
 	}
 
-	// 2. Check in app data local bin directory
 	appDir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
@@ -48,28 +53,35 @@ func findCloudflared() (string, error) {
 	return "", errors.New("cloudflared binary not found in PATH or local app bin folder")
 }
 
-// StartTunnel starts the Cloudflare tunnel process for a given port, with auto-reconnect.
-func StartTunnel(ctx context.Context, localPort int, onStatus func(status, url string, err error)) error {
-	tunnelMu.Lock()
-	defer tunnelMu.Unlock()
+func StartEphemeralTunnel(ctx context.Context, localPort int, onStatus func(status, url string, err error)) error {
+	return StartEphemeralTunnelForProject("", ctx, localPort, onStatus)
+}
 
-	if tunnelStatus == "CONNECTED" || tunnelStatus == "CONNECTING" {
-		return fmt.Errorf("tunnel already running or connecting")
+func StartEphemeralTunnelForProject(projectID string, parentCtx context.Context, localPort int, onStatus func(status, url string, err error)) error {
+	if inst, exists := manager.instances.Load(projectID); exists {
+		t := inst.(*TunnelInstance)
+		if t.Status == "CONNECTED" || t.Status == "CONNECTING" {
+			return fmt.Errorf("tunnel already running for project %s", projectID)
+		}
 	}
 
-	tunnelStatus = "CONNECTING"
-	publicURL = ""
-	onStatus(tunnelStatus, "", nil)
+	runCtx, cancel := context.WithCancel(parentCtx)
+	instance := &TunnelInstance{
+		ProjectID: projectID,
+		Status:    "CONNECTING",
+		Ctx:       runCtx,
+		Cancel:    cancel,
+	}
+	manager.instances.Store(projectID, instance)
 
-	runCtx, cancel := context.WithCancel(ctx)
-	cancelFunc = cancel
+	onStatus("CONNECTING", "", nil)
 
 	go func() {
 		defer func() {
-			tunnelMu.Lock()
-			tunnelStatus = "DISCONNECTED"
-			publicURL = ""
-			tunnelMu.Unlock()
+			instance.mu.Lock()
+			instance.Status = "DISCONNECTED"
+			instance.URL = ""
+			instance.mu.Unlock()
 			onStatus("DISCONNECTED", "", nil)
 		}()
 
@@ -80,12 +92,11 @@ func StartTunnel(ctx context.Context, localPort int, onStatus func(status, url s
 			}
 
 			if attempt > 0 {
-				tunnelMu.Lock()
-				tunnelStatus = "RECONNECTING"
-				tunnelMu.Unlock()
-				onStatus("RECONNECTING", "", fmt.Errorf("connection drop detected, reconnecting attempt %d/%d", attempt, maxAttempts))
-				
-				// Exponential backoff: 1s, 2s, 4s, 8s, 16s
+				instance.mu.Lock()
+				instance.Status = "RECONNECTING"
+				instance.mu.Unlock()
+				onStatus("RECONNECTING", "", fmt.Errorf("reconnecting attempt %d/%d", attempt, maxAttempts))
+
 				select {
 				case <-runCtx.Done():
 					return
@@ -93,37 +104,30 @@ func StartTunnel(ctx context.Context, localPort int, onStatus func(status, url s
 				}
 			}
 
-			err := startCloudflaredProcess(runCtx, localPort, onStatus)
+			err := startCloudflaredProcess(runCtx, instance, localPort, onStatus)
 			if err == nil {
-				// Clean exit requested by cancel
 				return
 			}
-
-			// If it exited with error, loop to retry
-			fmt.Printf("[Tunnel] cloudflared exited with error: %v\n", err)
+			fmt.Printf("[Tunnel] project=%s cloudflared exited: %v\n", projectID, err)
 		}
 
-		tunnelMu.Lock()
-		tunnelStatus = "FAILED"
-		tunnelMu.Unlock()
+		instance.mu.Lock()
+		instance.Status = "FAILED"
+		instance.mu.Unlock()
 		onStatus("FAILED", "", fmt.Errorf("exhausted %d reconnection attempts", maxAttempts))
 	}()
 
 	return nil
 }
 
-func startCloudflaredProcess(ctx context.Context, localPort int, onStatus func(status, url string, err error)) error {
+func startCloudflaredProcess(ctx context.Context, instance *TunnelInstance, localPort int, onStatus func(status, url string, err error)) error {
 	binPath, err := findCloudflared()
 	if err != nil {
 		return err
 	}
 
 	args := []string{"tunnel", "--url", fmt.Sprintf("http://localhost:%d", localPort)}
-	
-	// Create command context
 	cmd := exec.CommandContext(ctx, binPath, args...)
-
-	// Configure platform-specific attributes to protect against zombies
 	core.SetPlatformSysProcAttr(cmd)
 
 	stderrPipe, err := cmd.StderrPipe()
@@ -131,21 +135,18 @@ func startCloudflaredProcess(ctx context.Context, localPort int, onStatus func(s
 		return err
 	}
 
-	tunnelMu.Lock()
-	tunnelCmd = cmd
-	tunnelMu.Unlock()
+	instance.mu.Lock()
+	instance.Cmd = cmd
+	instance.mu.Unlock()
 
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
-	// Read stderr for the public trycloudflare URL
 	urlRegex := regexp.MustCompile(`https://[a-zA-Z0-9-]+\.trycloudflare\.com`)
-	
 	urlChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
-	// Goroutine to scan stderr logs
 	go func() {
 		scanner := bufio.NewScanner(stderrPipe)
 		for scanner.Scan() {
@@ -165,15 +166,14 @@ func startCloudflaredProcess(ctx context.Context, localPort int, onStatus func(s
 		}
 	}()
 
-	// Wait for URL to appear or process to exit
 	select {
 	case <-ctx.Done():
 		return nil
 	case url := <-urlChan:
-		tunnelMu.Lock()
-		tunnelStatus = "CONNECTED"
-		publicURL = url
-		tunnelMu.Unlock()
+		instance.mu.Lock()
+		instance.Status = "CONNECTED"
+		instance.URL = url
+		instance.mu.Unlock()
 		onStatus("CONNECTED", url, nil)
 	case err := <-errChan:
 		return fmt.Errorf("failed scanning cloudflared logs: %w", err)
@@ -181,47 +181,52 @@ func startCloudflaredProcess(ctx context.Context, localPort int, onStatus func(s
 		return fmt.Errorf("timeout waiting for cloudflared public URL")
 	}
 
-	// Keep running until process exits
 	err = cmd.Wait()
-	
-	// If context was cancelled, this is not an error
 	if ctx.Err() != nil {
 		return nil
 	}
-
 	if err != nil {
 		return err
 	}
-	return io.EOF // Return EOF to trigger reconnect if it exited with code 0 unexpectedly
+	return io.EOF
 }
 
-// StopTunnel stops any running tunnel.
+func StartTunnel(ctx context.Context, localPort int, onStatus func(status, url string, err error)) error {
+	return StartEphemeralTunnelForProject("", ctx, localPort, onStatus)
+}
+
 func StopTunnel() {
-	tunnelMu.Lock()
-	defer tunnelMu.Unlock()
-	if cancelFunc != nil {
-		cancelFunc()
-	}
-	if tunnelCmd != nil && tunnelCmd.Process != nil {
-		// On Windows, TaskKill or Job Objects should clean it, but let's signal it here
-		_ = tunnelCmd.Process.Kill()
-	}
+	StopTunnelForProject("")
 }
 
-// GetTunnelStatus returns current status and URL.
-func GetTunnelStatus() (string, string) {
-	tunnelMu.Lock()
-	defer tunnelMu.Unlock()
-	return tunnelStatus, publicURL
-}
-
-// SimulateDrop mocks connection failure.
-func SimulateDrop(onStatus func(status, url string, err error)) {
-	tunnelMu.Lock()
-	defer tunnelMu.Unlock()
-	if tunnelStatus == "CONNECTED" {
-		if tunnelCmd != nil && tunnelCmd.Process != nil {
-			_ = tunnelCmd.Process.Kill() // Kills the process, triggering the reconnect loop
+func StopTunnelForProject(projectID string) {
+	if val, ok := manager.instances.Load(projectID); ok {
+		instance := val.(*TunnelInstance)
+		instance.Cancel()
+		instance.mu.Lock()
+		if instance.Cmd != nil && instance.Cmd.Process != nil {
+			_ = instance.Cmd.Process.Kill()
 		}
+		instance.mu.Unlock()
+		manager.instances.Delete(projectID)
 	}
+}
+
+func GetTunnelStatus() (string, string) {
+	return GetTunnelStatusForProject("")
+}
+
+func GetTunnelStatusForProject(projectID string) (string, string) {
+	if val, ok := manager.instances.Load(projectID); ok {
+		instance := val.(*TunnelInstance)
+		instance.mu.Lock()
+		defer instance.mu.Unlock()
+		return instance.Status, instance.URL
+	}
+	return "DISCONNECTED", ""
+}
+
+func SimulateDrop(onStatus func(status, url string, err error)) {
+	StopTunnel()
+	onStatus("DISCONNECTED", "", nil)
 }

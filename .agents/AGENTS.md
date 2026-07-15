@@ -2,7 +2,12 @@
 
 This repository contains **LocalCloud**, a minimalist self-hosting desktop engine designed to orchestrate reverse tunnels and control local OS resources. All AI coding assistants (including Antigravity, Claude Code, Cursor, Kimchi, OpenCode, and others) MUST adhere strictly to the rules and architecture outlined in this document.
 
-> **📋 Implementation Plan:** Before writing any feature code, read [IMPLEMENTATION_PLAN.md](file:///.agents/IMPLEMENTATION_PLAN.md) for the phased build order, file map, and ponytail rules.
+> **📋 Required Reading:** Before writing any code, AI assistants MUST read:
+> - [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) — phased build order, file map, ponytail rules
+> - [TASKS.md](./TASKS.md) — current task status and remaining work
+> - [HANDOVER.md](./HANDOVER.md) — feature-vertical track partitioning for parallel agents
+> - [DESIGN.md](../DESIGN.md) — "The Minimalist Hypervisor" visual spec (colors, typography, components)
+> - [PRODUCT.md](../PRODUCT.md) — product purpose, anti-references, design principles
 
 ---
 
@@ -87,3 +92,24 @@ This repository contains **LocalCloud**, a minimalist self-hosting desktop engin
 - **TailwindCSS v4 styling:** No `tailwind.config.js`. Use CSS-first config using `@import "tailwindcss";` in `src/index.css`.
 - **Git Commits:** Ensure commits are clean and authored directly by the user. Do NOT add `Co-authored-by` metadata headers to commits.
 - **Placeholders:** Avoid using placeholders in code. All stubs must have functional mock logic or type-safe defaults.
+
+---
+
+## 📊 6. IMPLEMENTATION STATUS (as of 2026-07-15)
+
+**Phases complete (all production code, no stubs):**
+- P1: Scanner, validation, runner, bundler
+- P2: OS resource limiters (Windows Job Objects + Linux cgroups v2/v1/posix)
+- P3: Cloudflare tunnels (ephemeral + permanent + reconnect)
+- P4: Vercel sync (env upsert + redeploy trigger)
+- P5: OS keyring (DPAPI + D-Bus + AES fallback)
+- P6: Log pipeline + resource monitor
+- P7: Single-project UI (DropZone, ControlPanel, Launching, Dashboard)
+- P8: Config persistence
+- P9: Security hardening (injection guard, zombie prevention, IPC lockdown)
+
+**Phases NOT done:**
+- **A4 (Multi-Project Hub):** Project registry (`engine/projects/project.go`), Dashboard rewrite to landing page, ProjectCard, AddProjectModal, App.tsx router rewrite, project bindings (`app_projects.go`)
+- **B4 (Per-Project Isolation):** Tunnel instances per projectID, resource monitors keyed by projectID, log streams keyed by projectID, project-aware telemetry bindings
+
+**Single-project functionality is fully working. Multi-project is the next milestone.**

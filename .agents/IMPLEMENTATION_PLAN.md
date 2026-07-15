@@ -4,7 +4,7 @@
 > YAGNI → stdlib → native platform → one line → minimum that works.
 > But every feature from the SCAD IS needed. ponytail governs HOW, not WHETHER.
 
-**All AI coding assistants** (Antigravity, Claude Code, Cursor, Kimchi, OpenCode) MUST read this plan before implementing any feature. Cross-reference with [AGENTS.md](file:///.agents/AGENTS.md) for architecture rules.
+**All AI coding assistants** (Antigravity, Claude Code, Cursor, Kimchi, OpenCode) MUST read this plan before implementing any feature. Cross-reference with [AGENTS.md](./AGENTS.md) for architecture rules, [DESIGN.md](../DESIGN.md) for the design system spec, and [PRODUCT.md](../PRODUCT.md) for product vision and anti-references.
 
 ---
 
@@ -12,16 +12,38 @@
 
 | Layer | File | Status |
 |---|---|---|
-| Go entry | `localcloud/main.go` | Wails bootstrap, embeds frontend, binds `App` struct |
-| Go bridge | `localcloud/app.go` | Exposes `ScanProject`, `LimitResources`, `StartTunnel`, `StopTunnel`, `SyncVercel` |
-| Engine: Limiter | `localcloud/engine/os_limiter.go` | **Stub** — prints to console, no real kernel calls |
-| Engine: Tunnel | `localcloud/engine/tunnel.go` | **Stub** — simulates cloudflared with sleep + mock URL |
-| Engine: Vercel | `localcloud/engine/vercel.go` | **Stub** — builds HTTP requests but discards them (`_ = req`) |
-| React UI | `localcloud/frontend/src/App.tsx` | Test dashboard with scan input + tunnel status card |
+| Go entry | `localcloud/main.go` | Wails bootstrap, embeds frontend, binds `App` struct, IPC hardening |
+| Go bridge | `localcloud/app.go` | Exposes `ScanProject`, `LimitResources` |
+| Go bridge | `localcloud/app_engine.go` | Exposes `GetSystemInfo`, `DownloadBunPortable`, `GetEngineStatus` |
+| Go bridge | `localcloud/app_telemetry.go` | Tunnel/vercel/keyring/config bindings |
+| Engine: Scanner | `localcloud/engine/scanner/` | **Done** — framework detection, port sniffing, runtime detection, caching |
+| Engine: Validate | `localcloud/engine/core/validate.go` | **Done** — port/path/script validation |
+| Engine: SysInfo | `localcloud/engine/core/sysinfo*.go` | **Done** — platform-specific RAM/CPU detection |
+| Engine: Runner | `localcloud/engine/process/runner.go` | **Done** — spawns dev server, pipes logs, tracks process |
+| Engine: Limiter | `localcloud/engine/process/os_limiter*.go` | **Done** — Windows Job Objects, Linux cgroups v2/v1/posix, dispatcher |
+| Engine: Tunnel | `localcloud/engine/tunnel/tunnel.go` | **Done** — ephemeral tunnel with 5× reconnect, URL parsing |
+| Engine: Tunnel API | `localcloud/engine/tunnel/tunnel_api.go` | **Done** — permanent tunnel + CF API v4 DNS CNAME |
+| Engine: Vercel | `localcloud/engine/vercel/vercel.go` | **Done** — real HTTP calls, env upsert, redeploy trigger |
+| Engine: Keyring | `localcloud/engine/keyring/keyring*.go` | **Done** — DPAPI (Windows), D-Bus Secret Service (Linux), AES fallback |
+| Engine: Bundler | `localcloud/engine/process/bundler.go` | **Done** — Bun portable download + unzip |
+| Engine: LogPipe | `localcloud/engine/process/logpipe.go` | **Done** — 100ms batched log emitter |
+| Engine: Monitor | `localcloud/engine/process/monitor*.go` | **Done** — platform-specific /proc and WinAPI resource polling |
+| Engine: ProcessGuard | `localcloud/engine/process/processguard.go` | **Done** — PID tracking, shutdown cleanup, zombie prevention |
+| Engine: Config | `localcloud/engine/core/config.go` | **Done** — JSON config persistence |
+| Engine: Projects | `localcloud/engine/projects/project.go` | **Not started** — Project registry, lifecycle functions |
+| React UI | `localcloud/frontend/src/App.tsx` | Single-project state machine (dropzone → control → launching → dashboard) |
+| React UI | `localcloud/frontend/src/screens/DropZone.tsx` | **Done** — drag-drop + file picker + shake animation |
+| React UI | `localcloud/frontend/src/screens/ControlPanel.tsx` | **Done** — sliders, selectors, config |
+| React UI | `localcloud/frontend/src/screens/Dashboard.tsx` | **Done** — single-project: URL card + charts + logs + stop |
+| React UI | `localcloud/frontend/src/screens/Launching.tsx` | **Done** — progress stepper |
+| React UI | `localcloud/frontend/src/components/OOMModal.tsx` | **Done** — OOM warning dialog |
+| React UI | `localcloud/frontend/src/components/LogTerminal.tsx` | **Done** — virtualized log list with color coding |
+| React UI | `localcloud/frontend/src/components/ResourceChart.tsx` | **Done** — Recharts area charts, 60-point window |
+| React UI | `localcloud/frontend/src/components/StatusDot.tsx` | **Done** — connection status indicator |
 | Styling | `localcloud/frontend/src/index.css` | Tailwind v4 CSS-first import + Nunito font |
 | Config | `localcloud/wails.json` | Author: MawanRequiem, npm install/build wired |
 
-**What is NOT done yet:** Everything below.
+**What is NOT done yet:** Everything in Phase A4 (multi-project hub) and B4 (per-project resource isolation). T29–T38 are the remaining work.
 
 ---
 
@@ -31,39 +53,39 @@ Every feature below MUST be implemented. Nothing is optional.
 
 | # | Feature | SCAD Section | Status |
 |---|---|---|---|
-| F1 | Project Scanner & Environment Sniffer | §3.1 | Stub exists |
-| F2 | Runtime Detection (Node/Bun) | §3.1 | Stub exists |
-| F3 | Bun Portable Auto-Download | §3.1 | Not started |
-| F4 | Windows Job Objects Resource Limiter | §3.2 | Stub only |
-| F5 | Linux cgroups v2 (systemd-run) Limiter | §3.2 | Stub only |
-| F6 | Linux cgroups v1 Fallback | §3.2 | Not started |
-| F7 | Linux Non-Systemd (taskset/prlimit) Fallback | §3.2 | Stub only |
-| F8 | OOM Detection & UI Alert | §3.2 | Not started |
-| F9 | Ephemeral Cloudflare Tunnel (Free Domain) | §3.3 | Stub only |
-| F10 | Permanent Cloudflare Tunnel (Custom DNS CNAME) | §3.3 | Not started |
-| F11 | Cloudflare API v4 Authentication | §3.3 | Not started |
-| F12 | Tunnel Auto-Reconnect (5 attempts) | §3.3 | Not started |
-| F13 | Tunnel Connection Drop Detection | §3.3 | Not started |
-| F14 | Vercel Env Variable Sync (PATCH) | §3.4 | Stub only |
-| F15 | Vercel Redeployment Trigger (POST) | §3.4 | Stub only |
-| F16 | Log Throttling & Backpressure (100ms batch) | §3.5 | Not started |
-| F17 | Log Ring Buffer (1000 lines in React) | §3.5 | Not started |
-| F18 | Virtualized Log List (react-window) | §3.5 | Not started |
-| F19 | Resource Usage Charts (Recharts) | §3.5 | Not started |
-| F20 | OS Keyring Secure Storage (DPAPI/D-Bus) | §4 | Not started |
-| F21 | Command Injection Guard | §4 | Partially done |
-| F22 | Anti-Zombie Process Guard (Linux PGID + Windows Job) | §4 | Not started |
-| F23 | Go-Routine Lifecycle Guard (context.WithCancel) | §4 | Partially done |
-| F24 | IPC Channel Hardening (WebView isolation) | §4 | Not started |
-| F25 | Drop-Zone Screen (drag-and-drop + file picker) | §UX | Not started |
-| F26 | Drop-Zone Shake Animation on Error | §UX | Not started |
-| F27 | Control Panel Screen (sliders, selectors) | §UX | Not started |
-| F28 | GO LIVE Button with Progress Transition | §UX | Not started |
-| F29 | Live Dashboard Screen (URL card + copy) | §UX | Not started |
-| F30 | Dev Server Process Runner (npm/bun) | — | Not started |
-| F31 | System Info (RAM/CPU detection for sliders) | — | Not started |
-| F32 | Project Config Persistence (last project, settings) | — | Not started |
-| F33 | cloudflared Binary Detection & Location | — | Not started |
+| F1 | Project Scanner & Environment Sniffer | §3.1 | Done |
+| F2 | Runtime Detection (Node/Bun) | §3.1 | Done |
+| F3 | Bun Portable Auto-Download | §3.1 | Done |
+| F4 | Windows Job Objects Resource Limiter | §3.2 | Done |
+| F5 | Linux cgroups v2 (systemd-run) Limiter | §3.2 | Done |
+| F6 | Linux cgroups v1 Fallback | §3.2 | Done |
+| F7 | Linux Non-Systemd (taskset/prlimit) Fallback | §3.2 | Done |
+| F8 | OOM Detection & UI Alert | §3.2 | Done |
+| F9 | Ephemeral Cloudflare Tunnel (Free Domain) | §3.3 | Done |
+| F10 | Permanent Cloudflare Tunnel (Custom DNS CNAME) | §3.3 | Done |
+| F11 | Cloudflare API v4 Authentication | §3.3 | Done |
+| F12 | Tunnel Auto-Reconnect (5 attempts) | §3.3 | Done |
+| F13 | Tunnel Connection Drop Detection | §3.3 | Done |
+| F14 | Vercel Env Variable Sync (PATCH) | §3.4 | Done |
+| F15 | Vercel Redeployment Trigger (POST) | §3.4 | Done |
+| F16 | Log Throttling & Backpressure (100ms batch) | §3.5 | Done |
+| F17 | Log Ring Buffer (1000 lines in React) | §3.5 | Done |
+| F18 | Virtualized Log List (react-window) | §3.5 | Done |
+| F19 | Resource Usage Charts (Recharts) | §3.5 | Done |
+| F20 | OS Keyring Secure Storage (DPAPI/D-Bus) | §4 | Done |
+| F21 | Command Injection Guard | §4 | Done |
+| F22 | Anti-Zombie Process Guard (Linux PGID + Windows Job) | §4 | Done |
+| F23 | Go-Routine Lifecycle Guard (context.WithCancel) | §4 | Done |
+| F24 | IPC Channel Hardening (WebView isolation) | §4 | Done |
+| F25 | Drop-Zone Screen (drag-and-drop + file picker) | §UX | Done |
+| F26 | Drop-Zone Shake Animation on Error | §UX | Done |
+| F27 | Control Panel Screen (sliders, selectors) | §UX | Done |
+| F28 | GO LIVE Button with Progress Transition | §UX | Done |
+| F29 | Live Dashboard Screen (URL card + copy) | §UX | Done (single-project only) |
+| F30 | Dev Server Process Runner (npm/bun) | — | Done |
+| F31 | System Info (RAM/CPU detection for sliders) | — | Done |
+| F32 | Project Config Persistence (last project, settings) | — | Done |
+| F33 | cloudflared Binary Detection & Location | — | Done |
 
 ---
 

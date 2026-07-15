@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 // ponytail: three-tier fallback using only exec.Command + /sys/fs/cgroup. No external deps.

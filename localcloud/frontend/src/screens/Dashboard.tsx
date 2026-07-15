@@ -1,225 +1,165 @@
 import React, { useState, useEffect } from "react";
-import { Copy, Check, ExternalLink, RefreshCw, XCircle } from "lucide-react";
-import { StatusDot } from "../components/StatusDot";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Box } from "lucide-react";
+import { ProjectCard } from "../components/ProjectCard";
 import { ResourceChart } from "../components/ResourceChart";
 import { LogTerminal } from "../components/LogTerminal";
-import { EventsOn, BrowserOpenURL } from "../../wailsjs/runtime/runtime";
-
-interface RunConfig {
-  projectPath: string;
-  runtime: string;
-  scriptName: string;
-  port: number;
-  memoryMB: number;
-  cpuCores: number;
-  vercelSync: boolean;
-  vercelEnvKey: string;
-  tunnelMode: string;
-}
+import { StatusDot } from "../components/StatusDot";
+import { Copy, Check, ExternalLink } from "lucide-react";
+import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
+import type { ProjectState } from "../types";
 
 interface DashboardProps {
-  tunnelURL: string;
-  runConfig: RunConfig;
-  onStop: () => void;
+  projects: ProjectState[];
+  selectedProjectID: string | null;
+  onSelectProject: (projectID: string) => void;
+  onStart: (projectID: string) => void;
+  onStop: (projectID: string) => void;
+  onRemove: (projectID: string) => void;
+  onAddProject: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  tunnelURL,
-  runConfig,
+  projects,
+  selectedProjectID,
+  onSelectProject,
+  onStart,
   onStop,
+  onRemove,
+  onAddProject,
 }) => {
+  const selectedProject = projects.find((p) => p.projectID === selectedProjectID);
   const [copied, setCopied] = useState(false);
-  const [uptime, setUptime] = useState(0);
-  const [tunnelState, setTunnelState] = useState({
-    status: "CONNECTED",
-    url: tunnelURL,
-    error: "",
-  });
 
-  // Uptime Counter
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setUptime((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Listen to connection drops and status changes
-  useEffect(() => {
-    const unsubscribe = EventsOn("tunnel-status", (data: { status: string; url: string; error?: string }) => {
-      setTunnelState({
-        status: data.status,
-        url: data.url,
-        error: data.error || "",
-      });
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const formatUptime = (seconds: number): string => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return [
-      hrs.toString().padStart(2, "0"),
-      mins.toString().padStart(2, "0"),
-      secs.toString().padStart(2, "0"),
-    ].join(":");
-  };
-
-  const handleCopy = async () => {
-    const url = tunnelState.url || tunnelURL;
+  const handleCopy = async (url: string) => {
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Clipboard copy failed: ", err);
-    }
+    } catch {}
   };
-
-  const handleOpenBrowser = () => {
-    const url = tunnelState.url || tunnelURL;
-    if (url) {
-      BrowserOpenURL(url);
-    }
-  };
-
-  const isConnected = tunnelState.status === "CONNECTED";
-  const isReconnecting =
-    tunnelState.status === "CONNECTING" ||
-    tunnelState.status === "RECONNECTING";
 
   return (
-    <div
-      className="w-full max-w-5xl h-[92vh] flex flex-col gap-5 text-white p-2 font-sans"
-      id="dashboard-screen"
-    >
-      {/* Top Header Panel */}
-      <div className="flex justify-between items-center bg-gray-950/40 border border-gray-900 rounded-xl p-4 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col">
-            <h1 className="text-lg font-bold tracking-tight text-white">
-              LocalCloud Dashboard
-            </h1>
-            <p className="text-[10px] text-gray-500 font-mono">
-              PORT: <span className="text-indigo-400">{runConfig.port}</span> | SCRIPT:{" "}
-              <span className="text-emerald-400">{runConfig.scriptName}</span>
-            </p>
-          </div>
+    <div className="flex-1 ml-[56px] min-h-screen bg-[#0b0f17] text-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#1f2937] bg-[#0b0f17]/80 backdrop-blur-sm sticky top-0 z-10">
+        <div>
+          <h1 className="text-lg font-bold tracking-tight text-[#f3f4f6]">
+            LocalCloud
+          </h1>
+          <p className="text-[10px] text-[#9ca3af] font-mono">
+            {projects.length} project{projects.length !== 1 ? "s" : ""} managed
+          </p>
         </div>
-
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col items-end">
-            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono">
-              Uptime
-            </span>
-            <span className="text-sm font-semibold font-mono text-gray-300">
-              {formatUptime(uptime)}
-            </span>
-          </div>
-
-          <div className="h-8 w-[1px] bg-gray-900" />
-
-          <div className="flex flex-col items-end">
-            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono mb-0.5">
-              Tunnel Link
-            </span>
-            <StatusDot status={tunnelState.status} />
-          </div>
-        </div>
-      </div>
-
-      {/* URL Exposure Card */}
-      <div
-        className={`relative overflow-hidden bg-gray-900/30 border rounded-xl p-5 backdrop-blur-lg transition-all duration-300 ${
-          isConnected
-            ? "border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
-            : isReconnecting
-            ? "border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)] animate-pulse"
-            : "border-gray-800"
-        }`}
-      >
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono">
-              Public Forwarding Address
-            </span>
-            <div className="mt-1">
-              {tunnelState.url ? (
-                <span className="text-base font-semibold text-white font-mono break-all selection:bg-indigo-500/30">
-                  {tunnelState.url}
-                </span>
-              ) : (
-                <span className="text-sm text-gray-500 font-mono italic">
-                  {isReconnecting
-                    ? "Generating secure connection tunnel..."
-                    : "No active tunnel link available"}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleCopy}
-              disabled={!tunnelState.url}
-              className="flex items-center gap-1.5 bg-gray-950 hover:bg-gray-900 disabled:opacity-40 disabled:hover:bg-gray-950 border border-gray-800 hover:border-gray-700 active:scale-98 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-all"
-              title="Copy URL"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-mono">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="font-mono">Copy</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={handleOpenBrowser}
-              disabled={!tunnelState.url}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 active:scale-98 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-all"
-              title="Open link in default browser"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span className="font-mono">Open</span>
-            </button>
-          </div>
-        </div>
-
-        {tunnelState.error && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-rose-400 bg-rose-950/20 border border-rose-900/30 px-3 py-1.5 rounded-lg font-mono">
-            <XCircle className="w-4 h-4 shrink-0" />
-            <span>{tunnelState.error}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Resource Performance Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ResourceChart type="ram" limit={runConfig.memoryMB} />
-        <ResourceChart type="cpu" limit={runConfig.cpuCores * 100} />
-      </div>
-
-      {/* Terminal Output */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        <LogTerminal />
-      </div>
-
-      {/* Bottom Floating Halt Action */}
-      <div className="flex justify-end pt-1">
         <button
-          onClick={onStop}
-          className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 hover:shadow-[0_0_12px_rgba(239,68,68,0.2)] active:scale-98 text-white font-mono text-xs font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer border border-rose-500/20"
+          onClick={onAddProject}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#6366f1] hover:bg-[#4f46e5] active:scale-[0.98] rounded-xl text-xs font-bold font-mono text-white transition-all cursor-pointer border border-[#6366f1]/20"
         >
-          STOP SERVICE
+          <Plus className="w-3.5 h-3.5" />
+          Add Project
         </button>
+      </div>
+
+      <div className="p-6">
+        {/* Empty State */}
+        {projects.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-24 text-center"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-[#6366f1]/10 border border-[#6366f1]/20 flex items-center justify-center mb-6">
+              <Box className="w-8 h-8 text-[#6366f1]" />
+            </div>
+            <h2 className="text-lg font-bold text-[#f3f4f6] mb-2">
+              Belum ada project.
+            </h2>
+            <p className="text-sm text-[#9ca3af] font-mono mb-6 max-w-sm">
+              Klik 'Add Project' untuk memulai server lokal dan mendapatkan URL publik dalam hitungan detik.
+            </p>
+            <button
+              onClick={onAddProject}
+              className="px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] active:scale-[0.98] rounded-xl text-sm font-bold font-mono text-white transition-all cursor-pointer"
+            >
+              + Tambah Project Pertama
+            </button>
+          </motion.div>
+        )}
+
+        {/* Project Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <AnimatePresence>
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.projectID}
+                project={project}
+                onStart={onStart}
+                onStop={onStop}
+                onRemove={onRemove}
+                isSelected={project.projectID === selectedProjectID}
+                onSelect={onSelectProject}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+
+        {/* Expanded Detail Panel */}
+        <AnimatePresence>
+          {selectedProject && selectedProject.status === "running" && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 space-y-4 overflow-hidden"
+            >
+              {/* URL Card */}
+              {selectedProject.tunnelURL && (
+                <div className="relative bg-gray-900/30 border border-emerald-500/30 rounded-xl p-5 backdrop-blur-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                  <div className="flex justify-between items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono">
+                        Public Forwarding Address
+                      </span>
+                      <div className="mt-1">
+                        <span className="text-base font-semibold text-white font-mono break-all">
+                          {selectedProject.tunnelURL}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleCopy(selectedProject.tunnelURL)}
+                        className="flex items-center gap-1.5 bg-gray-950 hover:bg-gray-900 border border-gray-800 hover:border-gray-700 active:scale-98 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-all"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-gray-400" />}
+                        <span className="font-mono">{copied ? "Copied" : "Copy"}</span>
+                      </button>
+                      <button
+                        onClick={() => BrowserOpenURL(selectedProject.tunnelURL)}
+                        className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-all"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span className="font-mono">Open</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Resource Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ResourceChart type="ram" limit={256} projectID={selectedProject.projectID} />
+                <ResourceChart type="cpu" limit={100} projectID={selectedProject.projectID} />
+              </div>
+
+              {/* Log Terminal */}
+              <div className="h-[400px] flex">
+                <LogTerminal projectID={selectedProject.projectID} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
